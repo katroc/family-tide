@@ -4,7 +4,8 @@ import { authService } from './services/authService';
 import { SetupWizard } from './components/SetupWizard';
 import { RealtimeProvider } from './components/RealtimeProvider';
 import { PerformanceMonitor } from './components/PerformanceMonitor';
-import { SupabaseConnectionTest, SupabaseDebugTest, SupabaseRLSTest } from './components/SupabaseTests';
+import SplashScreen from './components/SplashScreen';
+import { getRewardIcons } from './utils/iconUtils';
 import {
   FamilyMember,
   NewFamilyMember,
@@ -19,8 +20,7 @@ import {
   DailyRoutineProgress,
   TabId,
   FAMILY_MEMBER_ROLES,
-  DEFAULT_COLORS,
-  DEFAULT_REWARD_ICONS
+  DEFAULT_COLORS
 } from './types';
 
 // Import components
@@ -187,10 +187,12 @@ const App: React.FC = () => {
   }, [currentDate]);
 
   // Handle setup completion
-  const handleSetupComplete = useCallback(async () => {
+  const handleSetupComplete = useCallback(async (newFamilyId: string) => {
     setShowSetupWizard(false);
     setIsLoading(true);
     try {
+      dataService.setCurrentFamilyId(newFamilyId);
+      await dataService.initialize();
       await loadData();
     } catch (error) {
       console.error('Error loading data after setup:', error);
@@ -232,24 +234,43 @@ const App: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     
-    const checkSetup = async () => {
+    const checkSetup = async (retryCount = 0) => {
       try {
-        console.log('🔍 Checking if setup is complete...');
+        console.log('🔍 [App] Checking if setup is complete... (attempt:', retryCount + 1, ')');
+        
+        // Add a small delay to ensure authentication is fully established
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         const isComplete = await authService.isSetupComplete();
+        console.log('🔍 [App] Setup completion result:', isComplete);
         
         if (mounted) {
           if (isComplete) {
-            console.log('✅ Setup is complete, hiding setup wizard');
+            console.log('✅ [App] Setup is complete, hiding setup wizard');
             setShowSetupWizard(false);
           } else {
-            console.log('⚠️ Setup not complete, showing setup wizard');
+            console.log('⚠️ [App] Setup not complete, showing setup wizard');
             setShowSetupWizard(true);
           }
           setIsCheckingAuth(false);
         }
       } catch (error) {
-        console.error('❌ Error checking setup completion:', error);
+        console.error('❌ [App] Error checking setup completion:', error);
+        
+        // Retry once if this is the first attempt
+        if (retryCount === 0 && mounted) {
+          console.log('🔄 [App] Retrying setup check in 1 second...');
+          setTimeout(() => {
+            if (mounted) {
+              checkSetup(1);
+            }
+          }, 1000);
+          return;
+        }
+        
         if (mounted) {
+          // If there's an error after retry, default to showing setup wizard
+          console.log('🔄 [App] Defaulting to setup wizard due to persistent error');
           setShowSetupWizard(true);
           setIsCheckingAuth(false);
         }
@@ -556,14 +577,7 @@ const App: React.FC = () => {
 
   // Show loading state while checking auth
   if (isCheckingAuth) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking authentication...</p>
-        </div>
-      </div>
-    );
+    return <SplashScreen message="Checking authentication..." />;
   }
   
   // Show setup wizard if needed
@@ -573,61 +587,7 @@ const App: React.FC = () => {
   
   // Show loading state while data is being loaded
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your family data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // TEMPORARY: Supabase connection test mode
-  // Add ?test=supabase to URL to show test component
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('test') === 'supabase') {
-    return <SupabaseConnectionTest />;
-  }
-  
-  // Add ?test=debug to show detailed debug tests
-  if (urlParams.get('test') === 'debug') {
-    return <SupabaseDebugTest />;
-  }
-  
-  // Add ?test=rls to show RLS and permissions tests
-  if (urlParams.get('test') === 'rls') {
-    return <SupabaseRLSTest />;
-  }
-  
-  // TEMPORARY: Skip auth checking entirely if in test mode or bypass mode
-  // Add ?bypass=auth to skip the hanging auth check
-  if (urlParams.get('bypass') === 'auth') {
-    console.log('🚀 Bypassing auth check for testing');
-    return (
-      <div className="h-screen overflow-hidden flex flex-col" style={{backgroundColor: '#A8D8D8'}}>
-        <div className="flex-1 px-6 py-6 overflow-y-auto">
-          <div className="p-8 text-center text-gray-600">
-            <h2 className="text-2xl font-bold mb-4">Family Planner</h2>
-            <p className="mb-4">Auth bypass mode - app ready for Supabase migration</p>
-            <div className="space-y-2">
-              <a 
-                href="/?test=supabase" 
-                className="block p-3 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                🧪 Test Supabase Connection
-              </a>
-              <a 
-                href="/" 
-                className="block p-3 bg-gray-500 text-white rounded hover:bg-gray-600"
-              >
-                🔄 Return to Normal App
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <SplashScreen message="Loading your family data..." />;
   }
 
   return (
@@ -697,7 +657,7 @@ const App: React.FC = () => {
             setIsAddingReward(false);
           }}
           defaultNewRewardState={DEFAULT_NEW_REWARD_STATE}
-          availableIcons={[...DEFAULT_REWARD_ICONS]}
+          availableIcons={[]}
         />
       )}
 
