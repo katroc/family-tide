@@ -1,39 +1,43 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { EventItem, FamilyMember } from '../types';
 import { convertToHexColor } from '../utils/colorUtils';
 
-interface AddEventModalProps {
+interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveEvent: (newEventData: Omit<EventItem, 'id' | 'time'>) => void;
+  onSaveEvent: (eventData: Omit<EventItem, 'time'>) => void;
   familyMembers: FamilyMember[];
   eventColors: string[];
   defaultNewEventState: Omit<EventItem, 'id' | 'time'>;
+  eventToEdit?: EventItem | null;
 }
 
-const AddEventModal: React.FC<AddEventModalProps> = ({
+const EventModal: React.FC<EventModalProps> = ({
   isOpen,
   onClose,
   onSaveEvent,
   familyMembers,
   eventColors,
   defaultNewEventState,
+  eventToEdit = null,
 }) => {
-  const [newEvent, setNewEvent] = useState(defaultNewEventState);
+  const [eventState, setEventState] = useState<Omit<EventItem, 'time'>>({
+    ...defaultNewEventState,
+    ...(eventToEdit ? { ...eventToEdit } : {}),
+  });
 
   useEffect(() => {
     if (isOpen) {
-      setNewEvent(defaultNewEventState);
+      setEventState(eventToEdit ? { ...eventToEdit } : { ...defaultNewEventState });
     }
-  }, [isOpen, defaultNewEventState]);
+  }, [isOpen, defaultNewEventState, eventToEdit]);
 
-  const handleChange = useCallback(<K extends keyof typeof defaultNewEventState,>(field: K, value: (typeof defaultNewEventState)[K]) => {
-    setNewEvent(prev => ({ ...prev, [field]: value }));
+  const handleChange = useCallback(<K extends keyof Omit<EventItem, 'time'>>(field: K, value: Omit<EventItem, 'time'>[K]) => {
+    setEventState(prev => ({ ...prev, [field]: value }));
   }, []);
 
   const toggleAttendee = useCallback((memberName: string) => {
-    setNewEvent(prev => ({
+    setEventState(prev => ({
       ...prev,
       attendees: prev.attendees.includes(memberName)
         ? prev.attendees.filter(name => name !== memberName)
@@ -47,29 +51,29 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   }, [familyMembers]);
 
   const handleSave = useCallback(() => {
-    if (newEvent.title.trim() && newEvent.startTime && newEvent.endTime && newEvent.day) {
-      if (newEvent.startTime >= newEvent.endTime) {
+    if (eventState.title.trim() && eventState.startTime && eventState.endTime && eventState.day) {
+      if (eventState.startTime >= eventState.endTime) {
         alert("End time must be after start time.");
         return;
       }
-      onSaveEvent(newEvent);
+      onSaveEvent(eventState);
     } else {
       alert("Please fill in all required fields: Title, Day, Start Time, End Time.");
     }
-  }, [newEvent, onSaveEvent]);
+  }, [eventState, onSaveEvent]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-50 rounded-2xl p-6 w-full max-w-md sm:max-w-xl lg:max-w-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Add New Event</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">{eventToEdit ? 'Edit Event' : 'Add New Event'}</h3>
         <div className="space-y-3 sm:space-y-4">
           <div>
             <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Event Title</label>
             <input
               type="text"
-              value={newEvent.title}
+              value={eventState.title}
               onChange={(e) => handleChange('title', e.target.value)}
               className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
               placeholder="Enter event title"
@@ -79,7 +83,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
           <div>
             <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Day</label>
             <select
-              value={newEvent.day}
+              value={eventState.day}
               onChange={(e) => handleChange('day', e.target.value)}
               className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
             >
@@ -94,7 +98,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
               <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Start Time</label>
               <input
                 type="time"
-                value={newEvent.startTime}
+                value={eventState.startTime}
                 onChange={(e) => handleChange('startTime', e.target.value)}
                 className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
                 style={{ colorScheme: 'light' }}
@@ -104,7 +108,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
               <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">End Time</label>
               <input
                 type="time"
-                value={newEvent.endTime}
+                value={eventState.endTime}
                 onChange={(e) => handleChange('endTime', e.target.value)}
                 className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
                 style={{ colorScheme: 'light' }}
@@ -116,7 +120,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
             <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Attendees</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border border-slate-200 rounded-lg bg-slate-100/50 max-h-32 overflow-y-auto">
               {familyMembers.map(member => {
-                const isSelected = newEvent.attendees.includes(member.name);
+                const isSelected = eventState.attendees.includes(member.name);
                 const memberColor = getMemberColor(member.name);
                 
                 return (
@@ -158,7 +162,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     key={color}
                     onClick={() => handleChange('color', color)}
                     className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all
-                      ${newEvent.color === color
+                      ${eventState.color === color
                         ? 'border-slate-700 scale-110 ring-2 ring-offset-1 ring-slate-700'
                         : 'border-slate-200 hover:scale-105'
                       }
@@ -177,7 +181,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
             onClick={handleSave}
             className="flex-1 bg-teal-500 text-white py-3 px-4 sm:py-4 sm:px-6 rounded-xl hover:bg-teal-600 transition-colors font-medium text-sm sm:text-base min-h-[44px] sm:min-h-[48px]"
           >
-            Add Event
+            {eventToEdit ? 'Save Changes' : 'Add Event'}
           </button>
           <button
             onClick={onClose}
@@ -191,5 +195,5 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   );
 };
 
-export default AddEventModal;
+export default EventModal;
     

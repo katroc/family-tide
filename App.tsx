@@ -31,7 +31,7 @@ import CalendarTab from './components/CalendarTab';
 import BottomNavigation from './components/BottomNavigation';
 import EditMemberModal from './components/EditMemberModal';
 import AddRewardModal from './components/AddRewardModal';
-import AddEventModal from './components/AddEventModal';
+import EventModal from './components/EventModal';
 import AddChoreModal from './components/AddChoreModal';
 import EditChoreModal from './components/EditChoreModal';
 import ManageChoreTypesModal from './components/ManageChoreTypesModal';
@@ -608,6 +608,7 @@ const App: React.FC = () => {
                  familyMembers={familyMembers} 
                  onAddEvent={() => setIsAddingEvent(true)} 
                  currentLocation={familyDetails.address || null} 
+                 onEventsUpdated={setEvents}
                />;
       default:
         return <div className="p-8 text-center text-gray-600">Unknown Tab</div>;
@@ -731,7 +732,7 @@ const App: React.FC = () => {
       )}
 
       {isAddingEvent && (
-        <AddEventModal
+        <EventModal
           isOpen={isAddingEvent}
           onClose={() => setIsAddingEvent(false)}
           onSaveEvent={async (event) => {

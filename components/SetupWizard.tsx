@@ -237,15 +237,11 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       setError('Please enter a family name');
       return;
     }
-    if (!address.trim()) {
-      setError('Please enter a home address');
-      return;
-    }
     setIsLoading(true);
     setError(null);
     try {
       console.log('🚀 Starting family creation process...');
-      const result = await supabaseService.createFamily(familyName.trim(), address.trim());
+      const result = await supabaseService.createFamily(familyName.trim(), address.trim() || undefined);
       if (!result.success) {
         throw new Error(result.error || 'Family creation failed');
       }
@@ -253,6 +249,17 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       console.log('✅ Family created successfully:', familyContext);
       // Add a short delay to ensure DB commit
       await new Promise(res => setTimeout(res, 300));
+      // Save family photo if set
+      if (familyPhoto) {
+        try {
+          const { dataService } = await import('../dataService');
+          await dataService.setCurrentFamilyId(familyContext.id);
+          await dataService.saveFamilyPhoto(familyPhoto);
+          console.log('📸 Family photo saved successfully');
+        } catch (photoError) {
+          console.error('❌ Error saving family photo:', photoError);
+        }
+      }
       onComplete(familyContext.id); // Pass new family ID up
     } catch (err: any) {
       console.error('❌ Error during setup:', err);
@@ -270,7 +277,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       
       case 1:
         return (
-          <div className="p-6 max-w-md mx-auto bg-white rounded-xl shadow-lg overflow-hidden md:max-w-2xl">
+          <div className="p-6 max-w-md mx-auto bg-white rounded-xl shadow-lg overflow-hidden md:max-w-1xl">
             <h2 className="text-2xl font-bold mb-6 text-slate-800">Welcome to Family Tide</h2>
             <p className="text-slate-600 mb-6">
               Great! You're all set up. Now let's create your family. You can either create a new family or join an existing one.
@@ -294,65 +301,71 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       
       case 2:
         return (
-          <div className="p-6 max-w-3xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden text-slate-600">
+          <div className="p-6 max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden text-slate-600">
             <h2 className="text-2xl font-bold mb-6 text-slate-800">Create Your Family</h2>
-            {/* Family Photo Upload */}
-            <div className="mb-4 flex flex-col items-center">
-              <div className="relative bg-slate-200 rounded-2xl mb-2 h-32 w-32 overflow-hidden group flex-shrink-0">
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" aria-label="Upload family photo" />
-                {familyPhoto ? (
-                  <img src={familyPhoto} alt="Family Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-slate-500">
-                    <span className="text-xs">Click to add photo</span>
+            {/* Photo and Form Side by Side */}
+            <div className="flex flex-col md:flex-row gap-8 mb-6 items-start">
+              {/* Family Photo Upload */}
+              <div className="flex flex-col items-center md:items-start">
+                <div className="relative bg-slate-200 rounded-2xl mb-2 h-64 w-64 overflow-hidden group flex-shrink-0">
+                  <input type="file" accept="image/*" onChange={handlePhotoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" aria-label="Upload family photo" />
+                  {familyPhoto ? (
+                    <img src={familyPhoto} alt="Family Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-500">
+                      <span className="text-xs">Click to add photo</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10 pointer-events-none">
+                    <div className="bg-white/90 rounded-full p-1"><span className="text-slate-600 text-xs">Edit</span></div>
                   </div>
-                )}
-                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10 pointer-events-none">
-                  <div className="bg-white/90 rounded-full p-1"><span className="text-slate-600 text-xs">Edit</span></div>
                 </div>
               </div>
-            </div>
-            <div className="mb-4">
-              <label className="block text-slate-700 text-sm font-bold mb-2" htmlFor="familyName">
-                Family Name
-              </label>
-              <input
-                id="familyName"
-                type="text"
-                value={familyName}
-                onChange={(e) => setFamilyName(e.target.value)}
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-slate-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="e.g., The Smiths"
-              />
-            </div>
-            <div className="mb-6 relative">
-              <label className="block text-slate-700 text-sm font-bold mb-2" htmlFor="address">
-                Home Address
-              </label>
-              <input
-                id="address"
-                ref={addressInputRef}
-                type="text"
-                value={currentAddressInput}
-                onChange={handleAddressInputChange}
-                onFocus={() => {if (currentAddressInput.length > 2) setShowSuggestions(true);}}
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-slate-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="e.g., 123 Main St, Springfield"
-                autoComplete="off"
-              />
-              {showSuggestions && addressSuggestions.length > 0 && (
-                <div ref={suggestionsContainerRef} className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-48 overflow-y-auto">
-                  {addressSuggestions.map((suggestion) => (
-                    <div
-                      key={suggestion.place_id}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="p-2 hover:bg-slate-100 cursor-pointer text-sm text-slate-600"
-                    >
-                      {suggestion.display_name}
-                    </div>
-                  ))}
+              {/* Form Fields */}
+              <div className="flex-1 w-full">
+                <div className="mb-4">
+                  <label className="block text-slate-700 text-sm font-bold mb-2" htmlFor="familyName">
+                    Family Name
+                  </label>
+                  <input
+                    id="familyName"
+                    type="text"
+                    value={familyName}
+                    onChange={(e) => setFamilyName(e.target.value)}
+                    className="shadow appearance-none border rounded w-full py-2 px-3 text-slate-700 leading-tight focus:outline-none focus:shadow-outline"
+                    placeholder="e.g., The Smiths"
+                  />
                 </div>
-              )}
+                <div className="mb-6 relative">
+                  <label className="block text-slate-700 text-sm font-bold mb-2" htmlFor="address">
+                    Home Address <span className="text-xs text-slate-400">(optional)</span>
+                  </label>
+                  <input
+                    id="address"
+                    ref={addressInputRef}
+                    type="text"
+                    value={currentAddressInput}
+                    onChange={handleAddressInputChange}
+                    onFocus={() => {if (currentAddressInput.length > 2) setShowSuggestions(true);}}
+                    className="shadow appearance-none border rounded w-full py-2 px-3 text-slate-700 leading-tight focus:outline-none focus:shadow-outline"
+                    placeholder="e.g., 123 Main St, Springfield"
+                    autoComplete="off"
+                  />
+                  {showSuggestions && addressSuggestions.length > 0 && (
+                    <div ref={suggestionsContainerRef} className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {addressSuggestions.map((suggestion) => (
+                        <div
+                          key={suggestion.place_id}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="p-2 hover:bg-slate-100 cursor-pointer text-sm text-slate-600"
+                        >
+                          {suggestion.display_name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {error && (
@@ -371,9 +384,9 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               </button>
               <button
                 onClick={handleCreateFamily}
-                disabled={isLoading || !familyName.trim() || !address.trim()}
+                disabled={isLoading || !familyName.trim()}
                 className={`
-                  ${isLoading || !familyName.trim() || !address.trim()
+                  ${isLoading || !familyName.trim()
                     ? 'bg-teal-400 cursor-not-allowed'
                     : 'bg-teal-500 hover:bg-teal-600'}
                   text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline`}

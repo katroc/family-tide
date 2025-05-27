@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { EventItem, FamilyMember } from '../types';
-import { Plus, Sun, Loader2, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
+import { EventItem, FamilyMember, DEFAULT_COLORS } from '../types';
+import { Plus, Sun, Loader2, AlertTriangle, Wifi, WifiOff, Edit3, X } from 'lucide-react';
 import { mapWeatherCodeToDescriptionAndIcon, WeatherDisplayInfo } from '../utils';
 import { useRealtimeEvents } from '../hooks/useRealtimeData';
+import EventModal from './EventModal';
+import { dataService } from '../dataService';
 
 interface EventWithPosition extends EventItem {
   position: {
@@ -18,6 +20,7 @@ interface CalendarTabProps {
   familyMembers: FamilyMember[];
   onAddEvent: () => void;
   currentLocation: string | null;
+  onEventsUpdated?: (events: EventItem[]) => void;
 }
 
 interface WeatherData {
@@ -125,6 +128,7 @@ const processEvents = (events: EventItem[], day: string): EventWithPosition[] =>
   
   // For each column, calculate the width and position of each event
   const columnWidth = 100 / columns.length;
+  const rowHeightPercent = 100 / 15;
   
   columns.forEach((column, columnIndex) => {
     column.forEach(event => {
@@ -136,7 +140,8 @@ const processEvents = (events: EventItem[], day: string): EventWithPosition[] =>
       const adjustedEnd = Math.min(1260, endMinutes) - 420;    // 10pm = 1260 minutes
       
       // Calculate position and size
-      const top = (adjustedStart / 840) * 100; // 840 minutes = 14 hours (7am-10pm)
+      let top = (adjustedStart / 840) * 100 - rowHeightPercent / 2;
+      if (top < 0) top = 0;
       const height = ((adjustedEnd - adjustedStart) / 840) * 100;
       
       // Calculate left position based on column index
@@ -157,12 +162,35 @@ const processEvents = (events: EventItem[], day: string): EventWithPosition[] =>
   return result;
 };
 
-const CalendarTab: React.FC<CalendarTabProps> = ({ events, onAddEvent, currentLocation }) => {
-  const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+// Utility to get an offset Tailwind color class for the avatar
+function getOffsetColorClass(colorClass: string | undefined): string {
+  if (!colorClass) return 'bg-slate-200';
+  // Try to match bg-<color>-<shade>
+  const match = colorClass.match(/^(bg-)?([a-z]+)-(\d{3})$/);
+  if (!match) return colorClass;
+  const [, , base, shadeStr] = match;
+  const shade = parseInt(shadeStr, 10);
+  // Always go lighter
+  let newShade = shade - 100;
+  if (newShade < 50) newShade = 50;
+  return `bg-${base}-${newShade}`;
+}
+
+// Tooltip component for avatar hover (right side, themed)
+const AvatarTooltip: React.FC<{ name: string; email?: string }> = ({ name, email }) => (
+  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs shadow-xl border border-teal-300 whitespace-nowrap z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="font-semibold">{name}</div>
+    {email && <div className="text-teal-100 text-[10px]">{email}</div>}
+  </div>
+);
+
+const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddEvent, currentLocation, onEventsUpdated }) => {
+  const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: undefined }));
   const [currentDate] = useState(new Date());
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isWeatherLoading, setIsWeatherLoading] = useState<boolean>(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
 
   // Real-time events monitoring
   const { isConnected: isRealtimeConnected, lastUpdate } = useRealtimeEvents((eventType, record) => {
@@ -172,7 +200,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, onAddEvent, currentLo
 
   useEffect(() => {
     const timerId = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: undefined }));
     }, 1000);
     return () => clearInterval(timerId);
   }, []);
@@ -240,12 +268,18 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, onAddEvent, currentLo
 
   const WeatherIcon = weatherData?.icon || Sun;
 
+  // Get current month and year string
+  const monthYear = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
+      {/* Header with Month, Time, Weather */}
       <div className="flex flex-col sm:flex-row items-center mb-4 sm:mb-6 gap-3">
-        {/* Left Group: Time & Weather */}
-        <div className="flex items-center gap-2 sm:gap-3 order-first">
+        {/* Month/Year, Time, Weather */}
+        <div className="flex items-center gap-2 sm:gap-3 order-first w-full sm:w-auto">
+          <div className="text-teal-700 font-bold text-base sm:text-xl bg-slate-100/80 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-md min-w-[120px] flex items-center justify-center min-h-[40px] sm:min-h-[48px]">
+            {monthYear}
+          </div>
           <div className="text-slate-600 font-medium text-sm sm:text-base bg-slate-100/80 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-md min-w-[100px] sm:min-w-[110px] flex items-center justify-center min-h-[40px] sm:min-h-[48px]">
             {currentTime}
           </div>
@@ -338,10 +372,20 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, onAddEvent, currentLo
 
                   {/* Events for this day */}
                   {processEvents(events, dayInfo.dayName).map((event) => {
+                    // Find attendee info
+                    const attendeeMembers = (event.attendees || [])
+                      .map((name: string) => familyMembers.find(m => m.name === name))
+                      .filter(Boolean);
+                    const maxAvatars = 3;
+                    const extraCount = attendeeMembers.length > maxAvatars ? attendeeMembers.length - maxAvatars : 0;
+                    // Debug log
+                    if (attendeeMembers.length > 0) {
+                      console.log(`[CalendarTab] Event '${event.title}' attendees:`, attendeeMembers);
+                    }
                     return (
                       <div
                         key={event.id}
-                        className={`absolute rounded-md sm:rounded-lg p-1 shadow-sm z-10 overflow-hidden flex flex-col`}
+                        className={`absolute rounded-md sm:rounded-lg p-1 shadow-sm z-10 overflow-hidden flex flex-col group/event`}
                         style={{
                           top: event.position.top,
                           left: event.position.left,
@@ -352,6 +396,15 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, onAddEvent, currentLo
                         }}
                         title={`${event.title} (${event.time})`}
                       >
+                        {/* Edit button, visible on hover */}
+                        <button
+                          className="absolute top-1 right-1 opacity-0 group-hover/event:opacity-100 bg-white/80 hover:bg-teal-500 hover:text-white text-slate-600 rounded-full p-1 shadow transition-opacity z-20"
+                          style={{ transition: 'opacity 0.2s' }}
+                          onClick={e => { e.stopPropagation(); setEditingEvent(event); }}
+                          aria-label="Edit event"
+                        >
+                          <Edit3 size={14} />
+                        </button>
                         <div className={`w-full h-full rounded-md sm:rounded-lg p-1 ${event.color || 'bg-slate-200'}`}>
                           <div
                             className="text-[10px] font-medium text-slate-600 leading-none break-words"
@@ -370,6 +423,30 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, onAddEvent, currentLo
                           <div className="text-[9px] text-slate-600 leading-none mt-0.5">
                             {event.time}
                           </div>
+                          {/* Attendees Avatars */}
+                          {attendeeMembers.length > 0 && (
+                            <div className="flex items-center mt-1 space-x-1">
+                              {attendeeMembers.slice(0, maxAvatars).map((member, idx) => (
+                                <div
+                                  key={member.id}
+                                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-700 shadow-sm ${getOffsetColorClass(member.color)} relative group`}
+                                  style={{ zIndex: 10 - idx }}
+                                >
+                                  {member.photo ? (
+                                    <img src={member.photo} alt={member.name} className="w-full h-full object-cover rounded-full" />
+                                  ) : (
+                                    member.name?.[0] || '?'
+                                  )}
+                                  <AvatarTooltip name={member.name} email={member.email} />
+                                </div>
+                              ))}
+                              {extraCount > 0 && (
+                                <div className="w-5 h-5 rounded-full bg-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-700 shadow-sm" style={{ zIndex: 0 }}>
+                                  +{extraCount}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -380,6 +457,38 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, onAddEvent, currentLo
           </div>
         </div>
       </div>
+
+      {/* Edit Event Modal (uses EventModal) */}
+      {editingEvent && (
+        <EventModal
+          isOpen={!!editingEvent}
+          onClose={() => setEditingEvent(null)}
+          onSaveEvent={async (event) => {
+            try {
+              await dataService.updateEvent({ ...event, time: `${event.startTime} - ${event.endTime}` });
+              if (onEventsUpdated) {
+                const updatedEvents = await dataService.getEvents();
+                onEventsUpdated(updatedEvents);
+              }
+              setEditingEvent(null);
+            } catch (error) {
+              console.error('Error updating event:', error);
+              alert('Failed to update event. Please try again.');
+            }
+          }}
+          familyMembers={familyMembers}
+          eventColors={[...DEFAULT_COLORS]}
+          defaultNewEventState={{
+            title: '',
+            startTime: '12:00',
+            endTime: '13:00',
+            day: new Date().toLocaleDateString('en-US', { weekday: 'short' }),
+            color: DEFAULT_COLORS[0],
+            attendees: []
+          }}
+          eventToEdit={editingEvent}
+        />
+      )}
     </div>
   );
 };

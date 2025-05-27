@@ -88,6 +88,20 @@ const formatNominatimAddress = (
   return formattedAddressParts.join(', ');
 };
 
+// Utility to get an offset Tailwind color class for the avatar
+function getOffsetColorClass(colorClass: string | undefined): string {
+  if (!colorClass) return 'bg-slate-200';
+  // Try to match bg-<color>-<shade>
+  const match = colorClass.match(/^(bg-)?([a-z]+)-(\d{3})$/);
+  if (!match) return colorClass;
+  const [, , base, shadeStr] = match;
+  const shade = parseInt(shadeStr, 10);
+  // Always go lighter
+  let newShade = shade - 100;
+  if (newShade < 50) newShade = 50;
+  return `bg-${base}-${newShade}`;
+}
+
 const FamilyTab: React.FC<FamilyTabProps> = ({
   familyMembers,
   familyDetails,
@@ -215,7 +229,7 @@ const FamilyTab: React.FC<FamilyTabProps> = ({
           <div className="flex gap-2">
             <button 
               onClick={() => setIsShareModalOpen(true)} 
-              className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-lg transition-colors flex items-center gap-2 min-h-[40px] sm:min-h-[48px]"
+              className="bg-slate-100/60 hover:bg-blue-600 text-slate-600 rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-lg transition-colors flex items-center gap-2 min-h-[40px] sm:min-h-[48px]"
             >
               <QrCode size={18} />
               <span className="text-xs sm:text-sm font-medium">Share</span>
@@ -229,18 +243,8 @@ const FamilyTab: React.FC<FamilyTabProps> = ({
         
         <div className="flex flex-col lg:flex-row flex-1 gap-6 sm:gap-8 overflow-hidden min-h-0">
           <div 
-            className={`backdrop-blur-sm rounded-3xl p-4 sm:p-6 shadow-lg flex flex-col ${!isEditingFamily ? 'cursor-pointer' : ''} lg:w-2/5 lg:flex-shrink-0 relative min-h-0 lg:max-h-full`}
+            className={`backdrop-blur-sm rounded-3xl p-4 sm:p-6 shadow-lg flex flex-col lg:w-2/5 lg:flex-shrink-0 relative min-h-0 lg:max-h-full`}
             style={{backgroundColor: '#80B8BD'}}
-            onMouseDown={!isEditingFamily ? handlePressStart : undefined}
-            onTouchStart={!isEditingFamily ? handlePressStart : undefined}
-            onMouseUp={!isEditingFamily ? handlePressEnd : undefined}
-            onTouchEnd={!isEditingFamily ? handlePressEnd : undefined}
-            onMouseLeave={!isEditingFamily ? handlePressEnd : undefined}
-            onTouchCancel={!isEditingFamily ? handlePressEnd : undefined}
-            role={!isEditingFamily ? "button" : undefined}
-            tabIndex={!isEditingFamily ? 0 : undefined}
-            aria-label={!isEditingFamily ? "Press and hold to edit family details" : undefined}
-            onKeyDown={!isEditingFamily ? (e) => { if (e.key === 'Enter' || e.key === ' ') handlePressStart(e as any); } : undefined}
           >
             {isEditingFamily ? (
               <div className="h-full flex flex-col min-h-0">
@@ -306,7 +310,14 @@ const FamilyTab: React.FC<FamilyTabProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="h-full flex flex-col min-h-0">
+              <div className="h-full flex flex-col min-h-0 group">
+                <button 
+                  onClick={() => setIsEditingFamily(true)}
+                  className="absolute top-2 right-2 bg-slate-100/90 hover:bg-teal-500 hover:text-white text-slate-600 rounded-lg p-2 shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  aria-label="Edit family details"
+                >
+                  <Edit3 size={18} />
+                </button>
                 <div className="relative bg-gray-200/50 rounded-2xl mb-3 sm:mb-4 h-40 sm:h-48 group flex-shrink-0 overflow-hidden">
                   {familyPhoto ? (
                     <img src={familyPhoto} alt={familyDetails.name || "Family"} 
@@ -315,15 +326,6 @@ const FamilyTab: React.FC<FamilyTabProps> = ({
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full text-slate-500"><Home size={30} /></div>
-                  )}
-                  {familyPhoto && (
-                    <button 
-                      onClick={togglePhotoObjectFit}
-                      className="absolute top-2 right-2 bg-black/40 text-white p-1.5 rounded-full hover:bg-black/60 transition-opacity opacity-0 group-hover:opacity-100 z-10"
-                      title={photoObjectFit === 'cover' ? "Show entire image (contain)" : "Fill frame (cover)"}
-                    >
-                      {photoObjectFit === 'cover' ? <Shrink size={14} /> : <Expand size={14} />}
-                    </button>
                   )}
                 </div>
                 <div className="text-center flex-grow min-h-0 overflow-hidden">
@@ -348,9 +350,6 @@ const FamilyTab: React.FC<FamilyTabProps> = ({
                     ))}
                   </div>
                 )}
-                <div className="mt-auto pt-3 text-center flex-shrink-0"> 
-                    <p className="text-xs text-slate-500 italic">Press and hold card to edit</p>
-                </div>
               </div>
             )}
           </div>
@@ -387,7 +386,7 @@ const FamilyTab: React.FC<FamilyTabProps> = ({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (window.confirm(`Are you sure you want to delete ${member.name}? This action cannot be undone.`)) {
-                          onDeleteMember(member.id);
+                          onDeleteMember(Number(member.id));
                         }
                       }} 
                       className={`${buttonBg} ${isLightColor ? 'text-red-600' : 'text-red-300'} rounded-lg p-1 sm:p-2 ${buttonHover} transition-colors shadow-md min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center`} 
@@ -396,7 +395,7 @@ const FamilyTab: React.FC<FamilyTabProps> = ({
                       <Trash2 size={16} />
                     </button>
                   </div>
-                  <div className={`w-12 h-12 sm:w-16 sm:h-16 ${member.color || 'bg-slate-100'} rounded-full flex items-center justify-center mb-1 sm:mb-2 flex-shrink-0`}>
+                  <div className={`w-12 h-12 sm:w-16 sm:h-16 ${getOffsetColorClass(member.color) || 'bg-slate-100'} rounded-full flex items-center justify-center mb-1 sm:mb-2 flex-shrink-0`}>
                     <span className="text-xl sm:text-2xl font-bold text-slate-600">{member.initial}</span>
                   </div>
                   <div className="flex-grow flex flex-col justify-center">
