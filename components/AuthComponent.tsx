@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { supabaseService } from '../supabaseService';
+import { authService } from '../services/authService';
 
 interface AuthComponentProps {
-  onAuthSuccess: () => void;
+  onAuthSuccess: (isSetupComplete: boolean) => Promise<void>;
 }
 
 export const AuthComponent: React.FC<AuthComponentProps> = ({ onAuthSuccess }) => {
@@ -40,13 +41,14 @@ export const AuthComponent: React.FC<AuthComponentProps> = ({ onAuthSuccess }) =
         if (!result.success) {
           throw new Error(result.error || 'Sign up failed');
         }
-        onAuthSuccess();
+        await onAuthSuccess(false);
       } else {
         const result = await supabaseService.signIn(email, password);
         if (!result.success) {
           throw new Error(result.error || 'Sign in failed');
         }
-        onAuthSuccess();
+        const isSetupComplete = await authService.isSetupComplete();
+        await onAuthSuccess(isSetupComplete);
       }
     } catch (err: any) {
       console.error('❌ Authentication error:', err);

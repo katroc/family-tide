@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabaseService } from '../supabaseService';
 import { AuthComponent } from './AuthComponent';
 import QRScannerModal from './QRScannerModal';
+import { authService } from '../services/authService';
 
 interface SetupWizardProps {
   onComplete: (familyId: string) => void;
@@ -56,7 +57,7 @@ const formatNominatimAddress = (
   return formattedAddressParts.join(', ');
 };
 
-export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
+const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const [step, setStep] = useState(0); // Start with step 0 for authentication
   const [familyName, setFamilyName] = useState('');
   // Replace deviceName with address
@@ -132,26 +133,40 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     setIsLoading(true);
 
     try {
-      // Import the data service to use the join method
       const { dataService } = await import('../dataService');
-      const { supabase } = await import('../supabaseService');
-      // Check for authenticated user
+      const { supabase } = await import('../supabaseService'); // Corrected import
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('You must be logged in to join a family. Please log in and try again.');
       }
 
-      // Use the actual invite code from the scanned data
       const inviteCode = familyData.inviteCode;
       if (!inviteCode) {
         throw new Error('No invite code provided');
       }
-
-      // Call the join family method
-      await (dataService as any).joinFamilyWithInviteCode(inviteCode);
       
-      console.log('✅ Successfully joined family, completing setup');
-      onComplete(familyData.familyId);
+      // Ensure supabaseService is used if dataService doesn't have joinFamilyWithInviteCode
+      // Or preferably, dataService should wrap/expose this functionality.
+      // For this example, assuming supabaseService has a method or we adapt.
+      // Let's assume supabaseService.joinFamily (hypothetical or needs to be added to a service)
+      // This part needs to align with how joining a family actually sets the context.
+      // For now, we'll use the existing dataService call and ensure it sets the family context.
+
+      const joinResult = await dataService.joinFamilyWithInviteCode(inviteCode);
+      
+      // joinFamilyWithInviteCode should ideally set the familyId in dataService internally upon success
+      // and/or return the new familyId.
+      const joinedFamilyId = joinResult?.familyId || (joinResult?.family as any)?.id || familyData?.familyId;
+
+      if (!joinedFamilyId) {
+        console.error('❌ Error joining family: No family ID returned or found in response.', joinResult, familyData);
+        throw new Error('Failed to obtain family ID after joining.');
+      }
+
+      console.log('✅ Successfully joined family, completing setup with family ID:', joinedFamilyId);
+      dataService.setCurrentFamilyId(joinedFamilyId);
+      await dataService.initialize(); 
+      onComplete(joinedFamilyId);
     } catch (error: any) {
       console.error('❌ Error joining family:', error);
       setError(error.message || 'Failed to join family. Please check the invite code and try again.');
@@ -160,10 +175,48 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     }
   };
 
-  const handleAuthSuccess = () => {
-    console.log('✅ Authentication successful, proceeding to setup');
-    setIsAuthenticated(true);
-    setStep(1); // Move to welcome step
+  const handleAuthSuccess = async () => {
+    console.log('✅ Authentication reported by AuthComponent. Re-checking setup status in SetupWizard...');
+    setIsAuthenticated(true); // Mark as authenticated locally within wizard
+
+    try {
+      const isNowSetupComplete = await authService.isSetupComplete();
+      console.log('[SetupWizard] Post-auth isSetupComplete check result:', isNowSetupComplete);
+
+      if (isNowSetupComplete) {
+        console.log('[SetupWizard] Setup is now complete. Attempting to fetch family ID and bypass wizard steps.');
+        const { supabaseService } = await import('../supabaseService');
+        const userResult = await supabaseService.getCurrentUser();
+
+        if (userResult && userResult.user) {
+          const familiesResult = await supabaseService.getUserFamilies();
+          if (familiesResult.success && familiesResult.families && familiesResult.families.length > 0) {
+            const primaryFamilyId = familiesResult.families[0].family?.id;
+            if (primaryFamilyId) {
+              console.log('[SetupWizard] Found primary family ID:', primaryFamilyId, 'Calling onComplete.');
+              const { dataService } = await import('../dataService');
+              dataService.setCurrentFamilyId(primaryFamilyId);
+              await dataService.initialize(); // Initialize with the correct family ID
+              onComplete(primaryFamilyId); // Bypass wizard steps
+              return; // Exit early
+            } else {
+              console.warn('[SetupWizard] Setup complete, but no primary family ID found after login. Proceeding to step 1.');
+            }
+          } else {
+            console.warn('[SetupWizard] Setup complete, but no families found for user after login. Proceeding to step 1.');
+          }
+        } else {
+          console.warn('[SetupWizard] Setup complete, but could not get current user after login. Proceeding to step 1.');
+        }
+      }
+      // If not setup complete, or if any of the above checks failed to get familyId, proceed to wizard step 1
+      console.log('[SetupWizard] Setup not yet complete or family ID fetch failed. Proceeding to wizard step 1.');
+      setStep(1); // Move to welcome/create/join family step
+    } catch (error) {
+      console.error('[SetupWizard] Error in handleAuthSuccess during setup check/family ID fetch:', error);
+      setError('An error occurred while checking your setup. Please try again.');
+      setStep(1); // Fallback to step 1 on error
+    }
   };
 
   const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {

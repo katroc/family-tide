@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { dataService } from './dataService';
 import { authService } from './services/authService';
-import { SetupWizard } from './components/SetupWizard';
+import SetupWizard from './components/SetupWizard';
 import { RealtimeProvider } from './components/RealtimeProvider';
 import { PerformanceMonitor } from './components/PerformanceMonitor';
 import SplashScreen from './components/SplashScreen';
@@ -36,6 +36,7 @@ import AddChoreModal from './components/AddChoreModal';
 import EditChoreModal from './components/EditChoreModal';
 import ManageChoreTypesModal from './components/ManageChoreTypesModal';
 import ManageRoutinesModal from './components/ManageRoutinesModal';
+import { supabaseService, supabase } from './supabaseService';
 
 // Constants from types.ts
 const AVAILABLE_COLORS = [...DEFAULT_COLORS];
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   const [showSetupWizard, setShowSetupWizard] = useState<boolean>(true); // Start with setup wizard until we know user status
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const [currentFamilyId, setCurrentFamilyId] = useState<string | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   
   // Real-time data update handler
   const handleRealtimeDataUpdate = useCallback(async (table: string, eventType: string, record: any) => {
@@ -236,20 +238,57 @@ const App: React.FC = () => {
     
     const checkSetup = async (retryCount = 0) => {
       try {
-        console.log('🔍 [App] Checking if setup is complete... (attempt:', retryCount + 1, ')');
+        console.log('🔍 [App] Initial Checking if setup is complete... (attempt:', retryCount + 1, ')');
+        await new Promise(resolve => setTimeout(resolve, 100)); // Ensure auth state propagates
         
-        // Add a small delay to ensure authentication is fully established
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const isComplete = await authService.isSetupComplete();
-        console.log('🔍 [App] Setup completion result:', isComplete);
+        const setupStatus = await authService.isSetupComplete(); // This should return boolean
+        console.log('🔍 [App] Initial Setup completion result (boolean):', setupStatus);
         
         if (mounted) {
-          if (isComplete) {
-            console.log('✅ [App] Setup is complete, hiding setup wizard');
-            setShowSetupWizard(false);
+          if (setupStatus === true) { // Correctly check the boolean value
+            // If setup is complete, we need to get the familyId to initialize dataService correctly
+            console.log('✅ [App] Initial setup reported as complete. Attempting to load current family ID.');
+            try {
+              // We need to ensure dataService can get the family ID without being fully initialized with it yet.
+              // This might involve a specific call or ensuring getCurrentUser and then getUserFamilies can run.
+              // For now, let's assume authService can provide this or we fetch it directly.
+              // This is a critical point: how to get familyId if authService.isSetupComplete() is just a boolean?
+              // We'll rely on handleSetupComplete to be called by the wizard if needed,
+              // or for the user to be directed to login if not authenticated.
+
+              // Let's refine: if setup is complete, we assume a family exists.
+              // We need to get the user and their family to set the familyId.
+              const { supabaseService } = await import('./supabaseService'); // Ensure it's imported
+              const userResult = await supabaseService.getCurrentUser();
+
+              if (userResult && userResult.user) {
+                const familiesResult = await supabaseService.getUserFamilies();
+                if (familiesResult.success && familiesResult.families && familiesResult.families.length > 0) {
+                  const primaryFamilyId = familiesResult.families[0].family?.id;
+                  if (primaryFamilyId) {
+                    console.log('✅ [App] Found primary family ID:', primaryFamilyId);
+                    dataService.setCurrentFamilyId(primaryFamilyId);
+                    await dataService.initialize(); // Initialize with the correct family ID
+                    setShowSetupWizard(false);
+                    setCurrentFamilyId(primaryFamilyId); // Also set in App's state
+                  } else {
+                    console.warn('⚠️ [App] Setup complete, but no primary family ID found. Showing wizard.');
+                    setShowSetupWizard(true);
+                  }
+                } else {
+                  console.warn('⚠️ [App] Setup complete, but no families found for user. Showing wizard.');
+                  setShowSetupWizard(true);
+                }
+              } else {
+                console.log('👤 [App] No authenticated user found during initial setup check. Showing wizard (which includes AuthComponent).');
+                setShowSetupWizard(true); // No user, so show wizard for login/signup
+              }
+            } catch (e) {
+              console.error('❌ [App] Error fetching family ID during initial setup check:', e);
+              setShowSetupWizard(true); // Fallback to wizard on error
+            }
           } else {
-            console.log('⚠️ [App] Setup not complete, showing setup wizard');
+            console.log('⚠️ [App] Initial setup reported as not complete. Showing setup wizard.');
             setShowSetupWizard(true);
           }
           setIsCheckingAuth(false);
