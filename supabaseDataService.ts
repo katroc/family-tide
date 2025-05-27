@@ -29,8 +29,8 @@ export class SupabaseDataService {
 
     console.log('🔧 Initializing SupabaseDataService...');
     try {
-      const user = await supabaseService.getCurrentUser();
-      if (!user) {
+      const userResult = await supabaseService.getCurrentUser();
+      if (!userResult || !userResult.user) {
         // User might be new or auth state not yet fully propagated.
         // Proceed with initialization but without family context yet.
         console.warn('⚠️ User not authenticated during initial SupabaseDataService.initialize(). This might be normal for new user setup.');
@@ -1009,12 +1009,13 @@ export class SupabaseDataService {
     this.ensureInitialized(); // Ensure service itself is initialized
 
     try {
-      const user = await supabaseService.getCurrentUser();
-      if (!user || !user.id) {
+      const userResult = await supabaseService.getCurrentUser();
+      if (!userResult || !userResult.user || !userResult.user.id) {
         console.error('❌ Cannot create family: User not authenticated with Supabase or user ID is missing.');
         throw new Error('User not authenticated or user ID missing, cannot create family.');
       }
 
+      const user = userResult.user;
       console.log(`➕ Creating new family "${familyName}" for user ${user.id}`);
 
       // Insert new family into 'families' table, linking to the user
@@ -1051,63 +1052,36 @@ export class SupabaseDataService {
     this.ensureInitialized();
 
     try {
-      const user = await supabaseService.getCurrentUser();
-      if (!user || !user.id) {
+      const userResult = await supabaseService.getCurrentUser();
+      if (!userResult || !userResult.user || !userResult.user.id) {
         throw new Error('User not authenticated, cannot join family.');
       }
 
       console.log(`🔍 Looking for family with invite code: ${inviteCode}`);
 
-      // Find the family with the given invite code
-      const { data: familyData, error: familyError } = await supabase
-        .from('families')
-        .select('id, name, address, invite_code')
-        .eq('invite_code', inviteCode.toUpperCase())
-        .single();
-
-      if (familyError || !familyData) {
-        console.error('❌ Family not found with invite code:', inviteCode);
-        throw new Error('Invalid invite code. Please check and try again.');
+      // Use the proper RPC function that bypasses RLS issues
+      const joinResult = await supabaseService.joinFamilyByInvite(inviteCode, 'child');
+      
+      if (!joinResult.success) {
+        console.error('❌ Failed to join family:', joinResult.error);
+        throw new Error(joinResult.error || 'Failed to join family. Please check the invite code and try again.');
       }
 
-      console.log(`👨‍👩‍👧‍👦 Found family: ${familyData.name}`);
-
-      // Check if user is already a member of this family
-      const { data: existingMembership } = await supabase
-        .from('family_memberships')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('family_id', familyData.id)
-        .single();
-
-      if (existingMembership) {
-        console.log('ℹ️ User is already a member of this family');
-        this.currentFamilyId = familyData.id;
-        return { id: familyData.id, name: familyData.name, address: familyData.address };
+      const familyData = joinResult.family;
+      if (!familyData) {
+        throw new Error('Family data not returned after successful join.');
       }
 
-      // Add user to family_memberships
-      const { error: membershipError } = await supabase
-        .from('family_memberships')
-        .insert([
-          {
-            user_id: user.id,
-            family_id: familyData.id,
-            role: 'child', // Default role, can be changed later
-            joined_at: new Date().toISOString()
-          }
-        ]);
-
-      if (membershipError) {
-        console.error('❌ Error adding user to family:', membershipError);
-        throw new Error('Failed to join family. Please try again.');
-      }
-
-      // Set the current family context
+      console.log(`👨‍👩‍👧‍👦 Successfully joined family: ${familyData.name}`);
+      
+      // Set current family ID for this service instance
       this.currentFamilyId = familyData.id;
-      console.log(`✅ Successfully joined family: ${familyData.name}`);
-
-      return { id: familyData.id, name: familyData.name, address: familyData.address };
+      
+      return {
+        id: familyData.id,
+        name: familyData.name,
+        address: familyData.address
+      };
     } catch (error) {
       console.error('Error in joinFamilyWithInviteCode:', error);
       throw error;

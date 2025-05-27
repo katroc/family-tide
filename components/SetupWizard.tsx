@@ -39,7 +39,13 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     try {
       // Import the data service to use the join method
       const { dataService } = await import('../dataService');
-      
+      const { supabase } = await import('../supabaseService');
+      // Check for authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to join a family. Please log in and try again.');
+      }
+
       // Use the actual invite code from the scanned data
       const inviteCode = familyData.inviteCode;
       if (!inviteCode) {

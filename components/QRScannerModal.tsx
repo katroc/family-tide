@@ -89,7 +89,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           type: 'family-invite',
           familyId: '',
           familyName: 'Unknown Family',
-          inviteCode: data.trim().toUpperCase(),
+          inviteCode: data.trim(),
           timestamp: Date.now()
         };
       }
@@ -117,7 +117,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       type: 'family-invite',
       familyId: '',
       familyName: 'Unknown Family',
-      inviteCode: manualCode.trim().toUpperCase(),
+      inviteCode: manualCode.trim(),
       timestamp: Date.now()
     };
 
@@ -241,7 +241,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
                   placeholder="Enter invite code (e.g., ABC123)"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono tracking-wider uppercase"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono tracking-wider"
                   maxLength={20}
                 />
               </div>
