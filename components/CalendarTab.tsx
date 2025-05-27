@@ -279,27 +279,6 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, onAddEvent, currentLo
 
         <div className="hidden sm:block sm:flex-grow"></div>
 
-        {/* Real-time connection indicator */}
-        <div className="flex items-center gap-2 mr-2">
-          {isRealtimeConnected ? (
-            <div 
-              className="flex items-center gap-1 text-green-600 text-xs"
-              title="Real-time updates active"
-            >
-              <Wifi size={14} />
-              <span className="hidden sm:inline">Live</span>
-            </div>
-          ) : (
-            <div 
-              className="flex items-center gap-1 text-gray-400 text-xs"
-              title="Real-time updates disconnected"
-            >
-              <WifiOff size={14} />
-              <span className="hidden sm:inline">Offline</span>
-            </div>
-          )}
-        </div>
-
         <button
           onClick={onAddEvent}
           className="bg-teal-500 hover:bg-teal-600 text-white rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-lg transition-colors flex items-center gap-2 min-h-[40px] sm:min-h-[48px] sm:order-last self-start sm:self-center w-full sm:w-auto justify-center"

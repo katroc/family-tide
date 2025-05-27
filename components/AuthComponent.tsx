@@ -57,21 +57,23 @@ export const AuthComponent: React.FC<AuthComponentProps> = ({ onAuthSuccess }) =
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#A8D8D8] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h1 className="text-center text-3xl font-extrabold text-gray-900 mb-2">
-          Family Planner
-        </h1>
-        <p className="text-center text-gray-600 mb-8">
-          {isSignUp ? 'Create your account' : 'Sign in to your account'}
-        </p>
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <img 
+            src="/familytide.png" 
+            alt="Family Tide" 
+            className="w-52 h-52 object-contain"
+          />
+        </div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
                 Email address
               </label>
               <div className="mt-1">
@@ -83,14 +85,14 @@ export const AuthComponent: React.FC<AuthComponentProps> = ({ onAuthSuccess }) =
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+                  className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md placeholder-slate-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500 text-slate-600"
                   placeholder="Enter your email"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
                 Password
               </label>
               <div className="mt-1">
@@ -102,14 +104,15 @@ export const AuthComponent: React.FC<AuthComponentProps> = ({ onAuthSuccess }) =
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+                  className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md placeholder-slate-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500 text-slate-600"
                   placeholder="Enter your password"
                 />
               </div>
             </div>
+            
             {isSignUp && (
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700">
                   Confirm Password
                 </label>
                 <div className="mt-1">
@@ -121,7 +124,7 @@ export const AuthComponent: React.FC<AuthComponentProps> = ({ onAuthSuccess }) =
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500"
+                    className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md placeholder-slate-400 focus:outline-none focus:ring-teal-500 focus:border-teal-500 text-slate-600"
                     placeholder="Confirm your password"
                   />
                 </div>
@@ -174,32 +177,6 @@ export const AuthComponent: React.FC<AuthComponentProps> = ({ onAuthSuccess }) =
               </button>
             </div>
           </form>
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  Quick Test
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('test@familyplanner.app');
-                  setPassword('test123');
-                  setConfirmPassword('test123');
-                }}
-                className="w-full text-center py-2 px-4 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Use Test Credentials
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -254,6 +254,17 @@ class EnhancedDataService {
   async joinFamilyWithInviteCode(inviteCode: string) {
     return this.service.joinFamilyWithInviteCode(inviteCode);
   }
+
+  // Add this method to allow setting the current family context externally
+  setCurrentFamilyId(familyId: string) {
+    this.currentFamilyId = familyId;
+    if (this.cachedService && this.cachedService.setCurrentFamilyId) {
+      this.cachedService.setCurrentFamilyId(familyId);
+    }
+    if (baseSupabaseService.setCurrentFamilyId) {
+      baseSupabaseService.setCurrentFamilyId(familyId);
+    }
+  }
 }
 
 export const dataService = new EnhancedDataService();

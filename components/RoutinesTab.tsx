@@ -1,6 +1,7 @@
 import React from 'react';
 import { FamilyMember, Routine, DailyRoutineProgress } from '../types';
-import { CheckCircle2, Circle, Award, Settings } from 'lucide-react'; 
+import { CheckCircle2, Circle, Award, Settings } from 'lucide-react';
+import { getIcon } from '../utils/iconUtils'; 
 
 interface RoutinesTabProps {
   familyMembers: FamilyMember[];
@@ -112,7 +113,7 @@ const RoutinesTab: React.FC<RoutinesTabProps> = ({
                           ) : (
                             <Circle size={20} className="text-slate-400 mr-2 sm:mr-3 flex-shrink-0" />
                           )}
-                          <span className="text-2xl mr-2 sm:mr-3 flex-shrink-0">{step.icon}</span>
+                          <span className="text-2xl mr-2 sm:mr-3 flex-shrink-0">{getIcon(step.icon)}</span>
                           <span className={`text-sm sm:text-base ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-600'}`}>
                             {step.title}
                           </span>

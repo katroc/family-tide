@@ -1087,6 +1087,11 @@ export class SupabaseDataService {
       throw error;
     }
   }
+
+  // Add this method to allow setting the current family context externally
+  setCurrentFamilyId(familyId: string) {
+    this.currentFamilyId = familyId;
+  }
 }
 
 console.log('📦 SupabaseDataService loaded');

@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { ChoreType } from '../types';
 import { PlusCircle, Tag, Star, ListChecks, CheckCircle2 } from 'lucide-react';
 import { AVAILABLE_CHORE_ICONS } from '../constants';
+import { getIcon } from '../utils/iconUtils';
 
 interface ManageChoreTypesModalProps {
   isOpen: boolean;
@@ -130,7 +131,7 @@ const ManageChoreTypesModal: React.FC<ManageChoreTypesModalProps> = ({
               {choreTypes.map(type => (
                 <li key={type.id} className="bg-white p-3 rounded-lg border border-slate-200 flex justify-between items-center shadow-sm">
                   <div className="flex items-center">
-                    <span className="text-xl mr-3">{type.icon}</span>
+                    <span className="text-xl mr-3">{getIcon(type.icon)}</span>
                     <span className="text-slate-600 font-medium">{type.name}</span>
                   </div>
                   <div className="flex items-center">

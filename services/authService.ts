@@ -45,22 +45,35 @@ class MockAuthService {
   async isSetupComplete(session?: MockSession): Promise<boolean> {
     // Enhanced logic: Check both Supabase and SQLite data
     try {
-      console.log('🔍 Checking setup completion...');
+      console.log('🔍 [AuthService] Checking setup completion...');
       
       // Try Supabase family membership check first
       const hasSupabaseFamilies = await this.hasSupabaseFamilyMemberships();
+      console.log('🔍 [AuthService] Supabase family check result:', hasSupabaseFamilies);
       
       // If user has Supabase families, they're definitely set up
       if (hasSupabaseFamilies === true) {
-        console.log('✅ User has Supabase families - setup complete');
+        console.log('✅ [AuthService] User has Supabase families - setup complete');
         return true;
       }
       
-      // If Supabase check failed (null) or user has no Supabase families (false),
-      // check SQLite data as fallback
-      console.log('⬇️ Checking SQLite data (fallback or no Supabase families)...');
+      // If Supabase check failed (null), we can't rely on it, so check SQLite
+      // If Supabase returned false, user has no Supabase families, so check SQLite
+      console.log('⬇️ [AuthService] Checking SQLite data (fallback or no Supabase families)...');
+      
       const { dataService } = await import('../dataService');
-      await dataService.initialize();
+      
+      // Ensure dataService is properly initialized
+      try {
+        await dataService.initialize();
+        console.log('✅ [AuthService] DataService initialized successfully');
+      } catch (initError) {
+        console.error('❌ [AuthService] DataService initialization failed:', initError);
+        // If we can't initialize dataService, we can't check SQLite data
+        // Default to requiring setup
+        return false;
+      }
+      
       const familyMembers = await dataService.getFamilyMembers();
       const familyDetails = await dataService.getFamilyDetails();
       
@@ -69,24 +82,25 @@ class MockAuthService {
       const hasCustomName = familyDetails.name !== 'My Family';
       const hasSQLiteData = hasMembers || hasCustomName;
       
-      console.log('🔍 SQLite setup check:', { 
+      console.log('🔍 [AuthService] SQLite setup check:', { 
         hasMembers, 
         hasCustomName, 
         familyName: familyDetails.name,
+        memberCount: familyMembers.length,
         hasSQLiteData 
       });
       
       if (hasSQLiteData) {
-        console.log('✅ User has SQLite family data - setup complete');
+        console.log('✅ [AuthService] User has SQLite family data - setup complete');
         return true;
       }
       
       // User has neither Supabase nor SQLite family data
-      console.log('❌ User has no family data - setup required');
+      console.log('❌ [AuthService] User has no family data - setup required');
       return false;
       
     } catch (error) {
-      console.error('Error checking setup completion:', error);
+      console.error('❌ [AuthService] Error checking setup completion:', error);
       // On error, default to requiring setup to be safe
       return false;
     }
@@ -94,7 +108,7 @@ class MockAuthService {
 
   private async hasSupabaseFamilyMemberships(): Promise<boolean | null> {
     try {
-      console.log('🏠 Checking Supabase family memberships...');
+      console.log('🏠 [AuthService] Checking Supabase family memberships...');
       
       // Import supabaseService dynamically to avoid circular dependencies
       const { supabaseService } = await import('../supabaseService');
@@ -102,34 +116,36 @@ class MockAuthService {
       // Check if user is authenticated with Supabase
       const authUser = await supabaseService.getCurrentUser();
       if (!authUser) {
-        console.log('👤 No Supabase auth user found - will check SQLite fallback');
+        console.log('👤 [AuthService] No Supabase auth user found - will check SQLite fallback');
         return null; // Not authenticated with Supabase
       }
       
-      console.log('👤 Supabase user found:', authUser.email);
+      console.log('👤 [AuthService] Supabase user found:', authUser.email);
       
       // Get user's families
       const result = await supabaseService.getUserFamilies();
+      console.log('🏠 [AuthService] getUserFamilies result:', result);
+      
       if (!result.success) {
-        console.log('❌ Failed to get user families:', result.error, '- will check SQLite fallback');
+        console.log('❌ [AuthService] Failed to get user families:', result.error, '- will check SQLite fallback');
         return null; // Error getting families
       }
       
       const familyCount = result.families?.length || 0;
       const hasFamilies = familyCount > 0;
       
-      console.log(`🏠 Supabase family check: ${familyCount} families found`);
+      console.log(`🏠 [AuthService] Supabase family check: ${familyCount} families found`);
       
       if (hasFamilies) {
-        console.log('✅ User has Supabase families:', result.families.map(f => f.family.name));
+        console.log('✅ [AuthService] User has Supabase families:', result.families?.map(f => f.family?.name || 'Unknown'));
         return true;
       } else {
-        console.log('📝 User has no Supabase families - will check SQLite data');
+        console.log('📝 [AuthService] User has no Supabase families - will check SQLite data');
         return false;
       }
       
-    } catch (error) {
-      console.log('⚠️ Supabase family check failed:', error.message, '- will check SQLite fallback');
+    } catch (error: any) {
+      console.log('⚠️ [AuthService] Supabase family check failed:', error.message, '- will check SQLite fallback');
       return null; // Supabase not available
     }
   }
@@ -251,6 +267,52 @@ class MockAuthService {
       }
     };
   }
+
+  // Debug method to help troubleshoot setup completion issues
+  async debugSetupCompletion(): Promise<void> {
+    console.log('🔧 [AuthService] === DEBUG SETUP COMPLETION ===');
+    
+    try {
+      // Check current user
+      const user = await this.getCurrentUser();
+      console.log('👤 [Debug] Current user:', user);
+      
+      // Check session
+      const session = await this.getSession();
+      console.log('🔑 [Debug] Current session:', session);
+      
+      // Check Supabase families
+      console.log('🏠 [Debug] Checking Supabase families...');
+      const supabaseFamilies = await this.hasSupabaseFamilyMemberships();
+      console.log('🏠 [Debug] Supabase families result:', supabaseFamilies);
+      
+      // Check SQLite data
+      console.log('💾 [Debug] Checking SQLite data...');
+      const { dataService } = await import('../dataService');
+      await dataService.initialize();
+      
+      const familyMembers = await dataService.getFamilyMembers();
+      const familyDetails = await dataService.getFamilyDetails();
+      
+      console.log('💾 [Debug] SQLite family members:', familyMembers.length);
+      console.log('💾 [Debug] SQLite family details:', familyDetails);
+      
+      // Final setup completion check
+      const isComplete = await this.isSetupComplete();
+      console.log('✅ [Debug] Final setup completion result:', isComplete);
+      
+    } catch (error) {
+      console.error('❌ [Debug] Error during debug:', error);
+    }
+    
+    console.log('🔧 [AuthService] === END DEBUG ===');
+  }
 }
 
 export const authService = new MockAuthService();
+
+// Expose debug method globally for testing
+if (typeof window !== 'undefined') {
+  (window as any).debugSetupCompletion = () => authService.debugSetupCompletion();
+  console.log('🔧 Debug method exposed: Run `debugSetupCompletion()` in console to troubleshoot setup issues');
+}

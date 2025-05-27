@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Chore, FamilyMember, ChoreType } from '../types';
 import { convertToHexColor } from '../utils/colorUtils';
+import { getIcon } from '../utils/iconUtils';
 
 interface AddChoreModalProps {
   isOpen: boolean;
@@ -111,7 +112,7 @@ const AddChoreModal: React.FC<AddChoreModalProps> = ({
             >
               {choreTypes.map(type => (
                 <option key={type.id} value={type.id}>
-                  {type.icon} {type.name}
+                  {getIcon(type.icon)} {type.name}
                 </option>
               ))}
             </select>
@@ -154,7 +155,7 @@ const AddChoreModal: React.FC<AddChoreModalProps> = ({
           {newChore.icon && selectedChoreTypeId && (
             <div className="mt-2">
                 <span className="text-xs sm:text-sm font-medium text-slate-600">Icon: </span>
-                <span className="text-xl">{newChore.icon}</span>
+                <span className="text-xl">{getIcon(newChore.icon)}</span>
             </div>
           )}
         </div>

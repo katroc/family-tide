@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Reward } from '../types';
 import { XCircle } from 'lucide-react';
+import { getIcon, getRewardIcons, getIconName } from '../utils/iconUtils';
 
 interface AddRewardModalProps {
   isOpen: boolean;
@@ -92,54 +93,24 @@ const AddRewardModal: React.FC<AddRewardModalProps> = ({
           <div>
             <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Select Icon</label>
             <div className="grid grid-cols-5 sm:grid-cols-6 gap-2 p-2 sm:p-3 border border-slate-200 rounded-lg bg-slate-100/50 max-h-40 overflow-y-auto">
-              {availableIcons.map(icon => {
-                // Map icon names to emoji icons
-                const iconMap: { [key: string]: string } = {
-                  // Original icons
-                  'gift': '🎁',
-                  'star': '⭐',
-                  'trophy': '🏆',
-                  'medal': '🏅',
-                  'award': '🏆',
-                  'ribbon': '🎗️',
-                  'crown': '👑',
-                  'money': '💰',
-                  // Activity rewards
-                  'game': '🎮',
-                  'movie': '🎬',
-                  'music': '🎵',
-                  'book': '📚',
-                  // Food rewards
-                  'pizza': '🍕',
-                  'ice-cream': '🍦',
-                  // Celebration
-                  'balloon': '🎈',
-                  'fireworks': '🎆',
-                  // Outline variants
-                  'gift-outline': '🎀',
-                  'star-outline': '✨',
-                  'trophy-outline': '🏆',
-                  'medal-outline': '🎖️',
-                  'award-outline': '🎖️'
-                };
-                
-                const iconEmoji = iconMap[icon] || '❓';
+              {getRewardIcons().map((iconEmoji, index) => {
+                const iconName = getIconName(iconEmoji);
                 
                 return (
                   <button
-                    key={icon}
+                    key={`${iconName}-${index}`}
                     type="button"
-                    onClick={() => handleChange('icon', icon)}
+                    onClick={() => handleChange('icon', iconName)}
                     className={`
                       p-2 rounded-lg transition-all aspect-square flex items-center justify-center
                       text-2xl sm:text-3xl
-                      ${newReward.icon === icon 
+                      ${newReward.icon === iconName 
                         ? 'bg-purple-400 text-white scale-110 ring-2 ring-purple-500' 
                         : 'bg-white hover:bg-purple-100 text-slate-600 border border-slate-300 hover:scale-105'
                       }
                     `}
-                    aria-label={`Select icon ${icon}`}
-                    title={icon}
+                    aria-label={`Select icon ${iconName}`}
+                    title={iconName}
                   >
                     {iconEmoji}
                   </button>

@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { Chore, FamilyMember, Reward } from '../types';
 import { CheckSquare, Plus, Star, Award, Check, Settings, Gift, AlertTriangle, Edit3, Calendar, Wifi, WifiOff } from 'lucide-react';
 import { useRealtimeChores } from '../hooks/useRealtimeData';
+import { getIcon } from '../utils/iconUtils';
 
 interface ChoresTabProps {
   chores: Chore[];
@@ -58,21 +58,6 @@ const ChoresTab: React.FC<ChoresTabProps> = ({
       <div className="flex-shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
         <h2 className="text-xl sm:text-2xl font-light text-slate-600">Family Chores & Rewards</h2>
         <div className="flex flex-wrap gap-2 sm:gap-3">
-          {/* Real-time connection indicator */}
-          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50">
-            {isRealtimeConnected ? (
-              <div className="flex items-center gap-1 text-green-600 text-xs">
-                <Wifi size={12} />
-                <span className="hidden sm:inline">Live</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-gray-400 text-xs">
-                <WifiOff size={12} />
-                <span className="hidden sm:inline">Offline</span>
-              </div>
-            )}
-          </div>
-          
           <button 
             onClick={onManageChoreTypes}
             className="bg-slate-100/60 hover:bg-slate-200/80 backdrop-blur-sm text-slate-600 rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-md transition-colors flex items-center gap-2 min-h-[40px] sm:min-h-[48px]"
@@ -142,7 +127,7 @@ const ChoresTab: React.FC<ChoresTabProps> = ({
                         </div>
                         <div className="flex-grow">
                           <div className={`font-medium text-sm sm:text-base ${chore.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
-                            {chore.icon && <span className="mr-1.5 text-base sm:text-lg align-middle">{chore.icon}</span>}
+                            {chore.icon && <span className="mr-1.5 text-base sm:text-lg align-middle">{getIcon(chore.icon)}</span>}
                             {chore.title}
                           </div>
                           <div className="text-xs sm:text-sm text-slate-600 flex items-center gap-2">
@@ -205,7 +190,7 @@ const ChoresTab: React.FC<ChoresTabProps> = ({
                         </div>
                         <div className="flex-grow">
                           <div className={`text-xs sm:text-sm font-medium ${chore.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
-                            {chore.icon && <span className="mr-1.5 text-sm sm:text-base align-middle">{chore.icon}</span>}
+                            {chore.icon && <span className="mr-1.5 text-sm sm:text-base align-middle">{getIcon(chore.icon)}</span>}
                             {chore.title}
                           </div>
                           <div className="text-[10px] sm:text-xs text-slate-600 flex items-center gap-2">
@@ -311,7 +296,7 @@ const ChoresTab: React.FC<ChoresTabProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {rewards.map(reward => (
               <div key={reward.id} className="bg-slate-100/70 rounded-xl p-3 text-center shadow hover:shadow-md transition-shadow">
-                <div className="text-2xl sm:text-3xl mb-1">{reward.icon}</div>
+                <div className="text-2xl sm:text-3xl mb-1">{getIcon(reward.icon)}</div>
                 <div className="text-xs sm:text-sm font-medium text-slate-600">{reward.title}</div>
                 <div className="text-xs text-purple-600">{reward.cost} pts</div>
               </div>

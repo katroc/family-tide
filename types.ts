@@ -109,16 +109,16 @@ export const DEFAULT_COLORS = [
 ] as const;
 
 export const DEFAULT_REWARD_ICONS = [
-  // Main reward icons
-  'gift', 'star', 'trophy', 'medal', 'award', 'ribbon', 'crown', 'money',
+  // Main reward icons (using emoji characters)
+  '🎁', '⭐', '🏆', '🏅', '🏆', '🎗️', '👑', '💰',
   // Activity rewards
-  'game', 'movie', 'music', 'book', 
+  '🎮', '🎬', '🎵', '📚', 
   // Food rewards
-  'pizza', 'ice-cream', 
+  '🍕', '🍦', 
   // Celebration
-  'balloon',
-  // Outline variants
-  'gift-outline', 'star-outline', 'trophy-outline'
+  '🎈',
+  // Additional options
+  '🎀', '✨', '🎖️'
 ] as const;
 
 // **NEW: Type guards for runtime type checking**

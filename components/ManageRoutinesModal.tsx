@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Routine, RoutineStep, FamilyMember } from '../types';
 import { AVAILABLE_ROUTINE_STEP_ICONS, DEFAULT_NEW_ROUTINE_STATE, DEFAULT_NEW_ROUTINE_STEP_STATE } from '../constants';
 import { PlusCircle, Edit3, Trash2, Settings, Save, XCircle, Plus } from 'lucide-react';
+import { getIcon } from '../utils/iconUtils';
 
 interface ManageRoutinesModalProps {
   isOpen: boolean;
@@ -265,7 +266,7 @@ const ManageRoutinesModal: React.FC<ManageRoutinesModalProps> = ({
               <div className="space-y-1 max-h-48 overflow-y-auto">
                 {editingRoutine.steps.map((step, index) => (
                   <div key={step.id} className="flex items-center justify-between p-1.5 bg-slate-100 rounded-md text-sm">
-                    <span className="text-slate-600">{index + 1}. {step.icon} {step.title}</span>
+                    <span className="text-slate-600">{index + 1}. {getIcon(step.icon)} {step.title}</span>
                     <div className="flex gap-1">
                       <button onClick={() => handleEditStep(step)} className="p-1 text-slate-600 hover:text-teal-600"><Edit3 size={14}/></button>
                       <button onClick={() => handleDeleteStep(step.id)} className="p-1 text-slate-600 hover:text-red-600"><Trash2 size={14}/></button>
