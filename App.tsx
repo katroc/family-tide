@@ -738,10 +738,7 @@ const App: React.FC = () => {
           onSaveEvent={async (event) => {
             try {
               console.log('Saving event:', event);
-              const newEvent = await dataService.addEvent({
-                ...event,
-                time: `${event.startTime} - ${event.endTime}`
-              });
+              const newEvent = await dataService.addEvent(event);
               console.log('Event saved successfully:', newEvent);
               setEvents(prev => [...prev, newEvent]);
               setIsAddingEvent(false);
@@ -754,9 +751,7 @@ const App: React.FC = () => {
           eventColors={[...DEFAULT_COLORS]}
           defaultNewEventState={{
             title: '',
-            startTime: '12:00',
-            endTime: '13:00',
-            day: new Date().toLocaleDateString('en-US', { weekday: 'short' }),
+            date: '',
             color: DEFAULT_COLORS[0],
             attendees: []
           }}

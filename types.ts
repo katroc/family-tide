@@ -31,12 +31,10 @@ export interface Chore {
 export interface EventItem {
   id: string; // String to maintain compatibility (converted from numbers)
   title: string;
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
-  time: string; // Formatted time range e.g., "8:00 AM - 10:00 AM"
-  day: string; // Mon, Tue, etc.
+  date: string; // ISO string, e.g., "2024-06-10T14:00:00Z"
   color: string;
   attendees: string[]; // Array of FamilyMember IDs
+  endTime?: string; // Optional end time in HH:mm format
 }
 
 export interface Reward {

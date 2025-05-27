@@ -486,8 +486,7 @@ export class SupabaseDataService {
         .from('events')
         .select('*')
         .eq('family_id', familyId)
-        .order('day_of_week')
-        .order('start_time');
+        .order('date');
       if (error) throw error;
       console.log('[getEvents] Raw data from Supabase:', data);
       
@@ -502,14 +501,12 @@ export class SupabaseDataService {
             return member ? member.name : null;
           })
           .filter((name: string | null) => name !== null);
-          
+        
         return {
           id: String(row.id),
           title: row.title,
-          startTime: row.start_time,
-          endTime: row.end_time,
-          time: `${row.start_time} - ${row.end_time}`,
-          day: row.day_of_week,
+          date: row.date,
+          endTime: row.end_time || '',
           color: row.color,
           attendees: attendeeNames
         };
@@ -545,9 +542,8 @@ export class SupabaseDataService {
           {
             family_id: familyId,
             title: event.title,
-            start_time: event.startTime,
-            end_time: event.endTime,
-            day_of_week: event.day,
+            date: event.date,
+            end_time: event.endTime || null,
             color: event.color,
             attendee_ids: attendeeIds,
             created_at: new Date().toISOString()
@@ -560,12 +556,10 @@ export class SupabaseDataService {
       return {
         id: String(data.id),
         title: event.title,
-        startTime: event.startTime,
-        endTime: event.endTime,
-        day: data.day_of_week,
+        date: event.date,
+        endTime: event.endTime || '',
         color: event.color,
-        attendees: event.attendees || [], // Keep original names for UI
-        time: `${event.startTime} - ${event.endTime}`
+        attendees: event.attendees || []
       };
     } catch (error) {
       console.error('Error adding event:', error);
@@ -593,9 +587,8 @@ export class SupabaseDataService {
         .from('events')
         .update({
           title: event.title,
-          start_time: event.startTime,
-          end_time: event.endTime,
-          day_of_week: event.day,
+          date: event.date,
+          end_time: event.endTime || null,
           color: event.color,
           attendee_ids: attendeeIds,
           updated_at: new Date().toISOString()

@@ -32,9 +32,7 @@ export const DEFAULT_NEW_MEMBER_STATE: Omit<FamilyMember, 'id'> = {
 
 export const DEFAULT_NEW_EVENT_STATE = {
   title: '',
-  startTime: '09:00',
-  endTime: '10:00',
-  day: 'Mon',
+  date: '',
   attendees: [],
   color: EVENT_COLORS[0]
 };

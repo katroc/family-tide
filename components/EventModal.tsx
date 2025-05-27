@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { EventItem, FamilyMember } from '../types';
 import { convertToHexColor } from '../utils/colorUtils';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import './react-datepicker-custom.css';
+import { setMinutes, setHours } from 'date-fns';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -21,20 +25,52 @@ const EventModal: React.FC<EventModalProps> = ({
   defaultNewEventState,
   eventToEdit = null,
 }) => {
-  const [eventState, setEventState] = useState<Omit<EventItem, 'time'>>({
+  // Helper to parse ISO string to Date or fallback
+  const parseDate = (dateStr: string | undefined) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
+  // Helper to parse HH:mm string to Date (today)
+  const parseTime = (timeStr: string | undefined) => {
+    if (!timeStr) return null;
+    const [h, m] = timeStr.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h || 0, m || 0, 0, 0);
+    return d;
+  };
+
+  const [eventState, setEventState] = useState<any>({
     ...defaultNewEventState,
     ...(eventToEdit ? { ...eventToEdit } : {}),
+    date: eventToEdit?.date || '',
+    endTime: eventToEdit?.endTime || '',
   });
+  const [pickerDate, setPickerDate] = useState<Date | null>(parseDate(eventToEdit?.date || defaultNewEventState.date));
+  const [pickerEndTime, setPickerEndTime] = useState<Date | null>(parseTime(eventToEdit?.endTime || ''));
 
   useEffect(() => {
     if (isOpen) {
       setEventState(eventToEdit ? { ...eventToEdit } : { ...defaultNewEventState });
+      setPickerDate(parseDate(eventToEdit?.date || defaultNewEventState.date));
+      setPickerEndTime(parseTime(eventToEdit?.endTime || ''));
     }
   }, [isOpen, defaultNewEventState, eventToEdit]);
 
-  const handleChange = useCallback(<K extends keyof Omit<EventItem, 'time'>>(field: K, value: Omit<EventItem, 'time'>[K]) => {
-    setEventState(prev => ({ ...prev, [field]: value }));
+  const handleChange = useCallback((field: string, value: any) => {
+    setEventState((prev: any) => ({ ...prev, [field]: value }));
   }, []);
+
+  const handleDateChange = (date: Date | null) => {
+    setPickerDate(date);
+    handleChange('date', date ? date.toISOString() : '');
+  };
+
+  const handleEndTimeChange = (date: Date | null) => {
+    setPickerEndTime(date);
+    // Store as HH:mm string
+    handleChange('endTime', date ? date.toTimeString().slice(0,5) : '');
+  };
 
   const toggleAttendee = useCallback((memberName: string) => {
     setEventState(prev => ({
@@ -51,14 +87,10 @@ const EventModal: React.FC<EventModalProps> = ({
   }, [familyMembers]);
 
   const handleSave = useCallback(() => {
-    if (eventState.title.trim() && eventState.startTime && eventState.endTime && eventState.day) {
-      if (eventState.startTime >= eventState.endTime) {
-        alert("End time must be after start time.");
-        return;
-      }
-      onSaveEvent(eventState);
+    if (eventState.title.trim() && eventState.date) {
+      onSaveEvent(eventState); // endTime is included in eventState, but only date is persisted
     } else {
-      alert("Please fill in all required fields: Title, Day, Start Time, End Time.");
+      alert("Please fill in all required fields: Title and Date/Time.");
     }
   }, [eventState, onSaveEvent]);
 
@@ -79,39 +111,40 @@ const EventModal: React.FC<EventModalProps> = ({
               placeholder="Enter event title"
             />
           </div>
-          
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Day</label>
-            <select
-              value={eventState.day}
-              onChange={(e) => handleChange('day', e.target.value)}
-              className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
-            >
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                <option key={day} value={day}>{day}day</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Start Time</label>
-              <input
-                type="time"
-                value={eventState.startTime}
-                onChange={(e) => handleChange('startTime', e.target.value)}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex-1">
+              <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Start Date & Time</label>
+              <DatePicker
+                selected={pickerDate}
+                onChange={handleDateChange}
+                showTimeSelect
+                timeIntervals={15}
+                dateFormat="yyyy-MM-dd h:mm aa"
                 className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
-                style={{ colorScheme: 'light' }}
+                placeholderText="Select date and time"
+                minDate={new Date()}
+                autoComplete="off"
+                popperPlacement="bottom"
+                calendarClassName="rounded-xl shadow-lg border border-slate-200"
+                popperClassName="z-50"
               />
             </div>
-            <div>
+            <div className="flex-1">
               <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">End Time</label>
-              <input
-                type="time"
-                value={eventState.endTime}
-                onChange={(e) => handleChange('endTime', e.target.value)}
+              <DatePicker
+                selected={pickerEndTime}
+                onChange={handleEndTimeChange}
+                showTimeSelect
+                showTimeSelectOnly
+                timeIntervals={15}
+                timeCaption="End Time"
+                dateFormat="HH:mm"
                 className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
-                style={{ colorScheme: 'light' }}
+                placeholderText="Select end time"
+                autoComplete="off"
+                popperPlacement="bottom"
+                calendarClassName="rounded-xl shadow-lg border border-slate-200"
+                popperClassName="z-50"
               />
             </div>
           </div>

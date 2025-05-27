@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { EventItem, FamilyMember, DEFAULT_COLORS } from '../types';
-import { Plus, Sun, Loader2, AlertTriangle, Wifi, WifiOff, Edit3, X } from 'lucide-react';
+import { Plus, Sun, Loader2, AlertTriangle, Wifi, WifiOff, Edit3, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { mapWeatherCodeToDescriptionAndIcon, WeatherDisplayInfo } from '../utils';
 import { useRealtimeEvents } from '../hooks/useRealtimeData';
 import EventModal from './EventModal';
@@ -68,33 +68,46 @@ const getWeekDays = (currentReferenceDate: Date): WeekDayInfo[] => {
   return days;
 };
 
-// Function to check if two events overlap
+// Function to check if two events overlap (using date property)
 const eventsOverlap = (a: EventItem, b: EventItem): boolean => {
-  if (a.day !== b.day) return false;
-  
-  const parseTime = (timeStr: string): number => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
-  
-  const aStart = parseTime(a.startTime);
-  const aEnd = parseTime(a.endTime);
-  const bStart = parseTime(b.startTime);
-  const bEnd = parseTime(b.endTime);
-  
+  const aDate = new Date(a.date);
+  const bDate = new Date(b.date);
+  // Only overlap if on the same day
+  if (
+    aDate.getFullYear() !== bDate.getFullYear() ||
+    aDate.getMonth() !== bDate.getMonth() ||
+    aDate.getDate() !== bDate.getDate()
+  ) return false;
+
+  const aStart = aDate.getHours() * 60 + aDate.getMinutes();
+  const aEnd = a.endTime
+    ? (() => { const [h, m] = a.endTime.split(':').map(Number); return h * 60 + m; })()
+    : aStart + 60;
+  const bStart = bDate.getHours() * 60 + bDate.getMinutes();
+  const bEnd = b.endTime
+    ? (() => { const [h, m] = b.endTime.split(':').map(Number); return h * 60 + m; })()
+    : bStart + 60;
+
   return aStart < bEnd && bStart < aEnd;
 };
 
-// Function to process events and calculate their positions
-const processEvents = (events: EventItem[], day: string): EventWithPosition[] => {
+// Function to process events and calculate their positions (using date property)
+const processEvents = (events: EventItem[], dayDate: Date): EventWithPosition[] => {
   // Filter events for the current day
-  const dayEvents = events.filter(event => event.day === day);
+  const dayEvents = events.filter(event => {
+    const eventDate = new Date(event.date);
+    return (
+      eventDate.getFullYear() === dayDate.getFullYear() &&
+      eventDate.getMonth() === dayDate.getMonth() &&
+      eventDate.getDate() === dayDate.getDate()
+    );
+  });
   if (dayEvents.length === 0) return [];
 
   // Sort events by start time
   const sortedEvents = [...dayEvents].sort((a, b) => {
-    const aStart = parseInt(a.startTime.split(':')[0]) * 60 + parseInt(a.startTime.split(':')[1]);
-    const bStart = parseInt(b.startTime.split(':')[0]) * 60 + parseInt(b.startTime.split(':')[1]);
+    const aStart = new Date(a.date).getHours() * 60 + new Date(a.date).getMinutes();
+    const bStart = new Date(b.date).getHours() * 60 + new Date(b.date).getMinutes();
     return aStart - bStart;
   });
 
@@ -104,49 +117,37 @@ const processEvents = (events: EventItem[], day: string): EventWithPosition[] =>
   // Assign each event to the first column where it doesn't overlap with ANY event in that column
   sortedEvents.forEach(event => {
     let placed = false;
-    
-    // Try to place in existing column
     for (const column of columns) {
-      // Check if this event overlaps with ANY event in this column
       const hasOverlapInColumn = column.some(existingEvent => eventsOverlap(existingEvent, event));
-      
       if (!hasOverlapInColumn) {
         column.push(event);
         placed = true;
         break;
       }
     }
-    
-    // If couldn't place in any column, create a new one
     if (!placed) {
       columns.push([event]);
     }
   });
-  
+
   // Calculate positions for each event
   const result: EventWithPosition[] = [];
-  
-  // For each column, calculate the width and position of each event
   const columnWidth = 100 / columns.length;
   const rowHeightPercent = 100 / 15;
-  
+
   columns.forEach((column, columnIndex) => {
     column.forEach(event => {
-      const startMinutes = (parseInt(event.startTime.split(':')[0]) * 60) + parseInt(event.startTime.split(':')[1]);
-      const endMinutes = (parseInt(event.endTime.split(':')[0]) * 60) + parseInt(event.endTime.split(':')[1]);
-      
-      // Adjust times to fit within the visible calendar (7am-10pm)
+      const eventDate = new Date(event.date);
+      const startMinutes = eventDate.getHours() * 60 + eventDate.getMinutes();
+      const endMinutes = event.endTime
+        ? (() => { const [h, m] = event.endTime.split(':').map(Number); return h * 60 + m; })()
+        : startMinutes + 60;
       const adjustedStart = Math.max(420, startMinutes) - 420; // 7am = 420 minutes
       const adjustedEnd = Math.min(1260, endMinutes) - 420;    // 10pm = 1260 minutes
-      
-      // Calculate position and size
       let top = (adjustedStart / 840) * 100 - rowHeightPercent / 2;
       if (top < 0) top = 0;
       const height = ((adjustedEnd - adjustedStart) / 840) * 100;
-      
-      // Calculate left position based on column index
       const left = columnIndex * columnWidth;
-      
       result.push({
         ...event,
         position: {
@@ -158,7 +159,6 @@ const processEvents = (events: EventItem[], day: string): EventWithPosition[] =>
       });
     });
   });
-  
   return result;
 };
 
@@ -186,7 +186,7 @@ const AvatarTooltip: React.FC<{ name: string; email?: string }> = ({ name, email
 
 const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddEvent, currentLocation, onEventsUpdated }) => {
   const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: undefined }));
-  const [currentDate] = useState(new Date());
+  const [currentReferenceDate, setCurrentReferenceDate] = useState(new Date());
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isWeatherLoading, setIsWeatherLoading] = useState<boolean>(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
@@ -263,23 +263,49 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
     }
   }, [currentLocation]);
 
-  const currentWeekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
+  const currentWeekDays = useMemo(() => getWeekDays(currentReferenceDate), [currentReferenceDate]);
   const timeSlots = ['7am', '8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', '7pm', '8pm', '9pm'];
 
   const WeatherIcon = weatherData?.icon || Sun;
 
   // Get current month and year string
-  const monthYear = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const monthYear = currentReferenceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
   return (
     <div className="h-full flex flex-col">
       {/* Header with Month, Time, Weather */}
       <div className="flex flex-col sm:flex-row items-center mb-4 sm:mb-6 gap-3">
-        {/* Month/Year, Time, Weather */}
+        {/* Month/Year, Time, Weather, with week navigation */}
         <div className="flex items-center gap-2 sm:gap-3 order-first w-full sm:w-auto">
+          {/* Previous week button */}
+          <button
+            className="rounded-full bg-slate-100/80 hover:bg-teal-100 p-2 sm:p-2.5 shadow-md flex items-center justify-center text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-400"
+            aria-label="Previous week"
+            onClick={() => setCurrentReferenceDate(prev => {
+              const d = new Date(prev);
+              d.setDate(d.getDate() - 7);
+              return d;
+            })}
+            style={{ minWidth: 40, minHeight: 40 }}
+          >
+            <ChevronLeft size={22} />
+          </button>
           <div className="text-teal-700 font-bold text-base sm:text-xl bg-slate-100/80 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-md min-w-[120px] flex items-center justify-center min-h-[40px] sm:min-h-[48px]">
             {monthYear}
           </div>
+          {/* Next week button */}
+          <button
+            className="rounded-full bg-slate-100/80 hover:bg-teal-100 p-2 sm:p-2.5 shadow-md flex items-center justify-center text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-400"
+            aria-label="Next week"
+            onClick={() => setCurrentReferenceDate(prev => {
+              const d = new Date(prev);
+              d.setDate(d.getDate() + 7);
+              return d;
+            })}
+            style={{ minWidth: 40, minHeight: 40 }}
+          >
+            <ChevronRight size={22} />
+          </button>
           <div className="text-slate-600 font-medium text-sm sm:text-base bg-slate-100/80 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-md min-w-[100px] sm:min-w-[110px] flex items-center justify-center min-h-[40px] sm:min-h-[48px]">
             {currentTime}
           </div>
@@ -371,7 +397,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
                   </div>
 
                   {/* Events for this day */}
-                  {processEvents(events, dayInfo.dayName).map((event) => {
+                  {processEvents(events, dayInfo.fullDate).map((event) => {
                     // Find attendee info
                     const attendeeMembers = (event.attendees || [])
                       .map((name: string) => familyMembers.find(m => m.name === name))
@@ -421,7 +447,14 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
                             {event.title}
                           </div>
                           <div className="text-[9px] text-slate-600 leading-none mt-0.5">
-                            {event.time}
+                            {(() => {
+                              const d = new Date(event.date);
+                              const start = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              if (event.endTime) {
+                                return `${start} - ${event.endTime}`;
+                              }
+                              return start;
+                            })()}
                           </div>
                           {/* Attendees Avatars */}
                           {attendeeMembers.length > 0 && (
@@ -465,7 +498,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
           onClose={() => setEditingEvent(null)}
           onSaveEvent={async (event) => {
             try {
-              await dataService.updateEvent({ ...event, time: `${event.startTime} - ${event.endTime}` });
+              await dataService.updateEvent(event);
               if (onEventsUpdated) {
                 const updatedEvents = await dataService.getEvents();
                 onEventsUpdated(updatedEvents);
@@ -480,9 +513,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
           eventColors={[...DEFAULT_COLORS]}
           defaultNewEventState={{
             title: '',
-            startTime: '12:00',
-            endTime: '13:00',
-            day: new Date().toLocaleDateString('en-US', { weekday: 'short' }),
+            date: '',
             color: DEFAULT_COLORS[0],
             attendees: []
           }}
