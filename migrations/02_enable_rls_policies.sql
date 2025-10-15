@@ -108,12 +108,6 @@ CREATE POLICY "Users can read their settings" ON user_app_settings
 
 -- ADDITIONAL SECURITY SETTINGS
 
--- Allow anonymous users to check if Supabase is working (for our health check)
-CREATE POLICY "Allow anonymous health check" ON pg_tables
-  FOR SELECT
-  TO anon
-  USING (schemaname = 'information_schema');
-
 -- Ensure auth.users table has proper policies (if needed)
 -- Note: auth.users typically has built-in RLS policies
 

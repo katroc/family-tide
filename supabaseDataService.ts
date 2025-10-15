@@ -333,10 +333,6 @@ export class SupabaseDataService {
         const familyMembers = await this.getFamilyMembers();
         const member = familyMembers.find(m => m.name === chore.assignedTo[0]);
         assignedToId = member ? member.id : null;
-      } else if (chore.assignedTo && typeof chore.assignedTo === 'string') {
-        const familyMembers = await this.getFamilyMembers();
-        const member = familyMembers.find(m => m.name === chore.assignedTo);
-        assignedToId = member ? member.id : null;
       }
 
       const { data, error } = await supabase

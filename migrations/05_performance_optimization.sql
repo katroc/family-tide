@@ -1,9 +1,6 @@
 -- Performance Optimization for Family Planner
 -- Stage 7.1: Advanced Indexing and Query Optimization
 
--- Enable timing for performance monitoring
-\timing on
-
 -- 1. CRITICAL INDEXES FOR QUERY PERFORMANCE
 -- These indexes are essential for fast family-scoped queries
 
@@ -52,19 +49,21 @@ ON chore_types(family_id, name);
 -- 3. PARTIAL INDEXES FOR FILTERED QUERIES
 
 -- Active chores only (completed = false)
-CREATE INDEX IF NOT EXISTS idx_chores_active_family 
-ON chores(family_id, due_date, assigned_to_id) 
+CREATE INDEX IF NOT EXISTS idx_chores_active_family
+ON chores(family_id, due_date, assigned_to_id)
 WHERE status = 'pending';
 
 -- Overdue chores for alerts
-CREATE INDEX IF NOT EXISTS idx_chores_overdue 
-ON chores(family_id, due_date, assigned_to_id) 
-WHERE status = 'pending' AND due_date < CURRENT_DATE;
+-- Note: Cannot use CURRENT_DATE in index predicate (not immutable)
+-- Use regular index instead
+CREATE INDEX IF NOT EXISTS idx_chores_overdue
+ON chores(family_id, due_date, assigned_to_id, status);
 
--- Recent routine progress (last 30 days)
-CREATE INDEX IF NOT EXISTS idx_routine_progress_recent 
-ON daily_routine_progress(member_id, date, is_fully_completed) 
-WHERE date >= CURRENT_DATE - INTERVAL '30 days';
+-- Recent routine progress
+-- Note: Cannot use CURRENT_DATE in index predicate (not immutable)
+-- Use regular index instead
+CREATE INDEX IF NOT EXISTS idx_routine_progress_recent
+ON daily_routine_progress(member_id, date, is_fully_completed);
 
 -- 4. FULL-TEXT SEARCH INDEXES (Future enhancement)
 
@@ -93,49 +92,11 @@ ANALYZE daily_routine_progress;
 ANALYZE chore_types;
 
 -- 6. PERFORMANCE MONITORING VIEWS
-
--- Query to check index usage
-CREATE OR REPLACE VIEW index_usage_stats AS
-SELECT 
-    schemaname,
-    tablename,
-    indexname,
-    idx_tup_read,
-    idx_tup_fetch,
-    idx_scan
-FROM pg_stat_user_indexes 
-WHERE schemaname = 'public'
-ORDER BY idx_scan DESC;
-
--- Query to find slow queries (when pg_stat_statements is enabled)
-CREATE OR REPLACE VIEW slow_queries AS
-SELECT 
-    query,
-    calls,
-    total_time,
-    mean_time,
-    min_time,
-    max_time
-FROM pg_stat_statements 
-WHERE query LIKE '%family%' OR query LIKE '%chores%' OR query LIKE '%events%'
-ORDER BY mean_time DESC
-LIMIT 20;
+-- Note: Removed due to Supabase restrictions on system table access
 
 -- 7. TABLE MAINTENANCE COMMANDS
+-- Note: VACUUM commands removed as they cannot run in transaction blocks in Supabase
+-- Supabase handles vacuuming automatically
 
--- Update table statistics
-UPDATE pg_stat_user_tables SET n_tup_ins = 0, n_tup_upd = 0, n_tup_del = 0;
-
--- Vacuum tables for performance
-VACUUM ANALYZE families;
-VACUUM ANALYZE family_memberships;
-VACUUM ANALYZE family_members;
-VACUUM ANALYZE chores;
-VACUUM ANALYZE events;
-VACUUM ANALYZE rewards;
-VACUUM ANALYZE routines;
-VACUUM ANALYZE daily_routine_progress;
-
-\echo 'Performance optimizations completed successfully!'
-\echo 'Run \\d+ <table_name> to see indexes on specific tables'
-\echo 'Run SELECT * FROM index_usage_stats; to monitor index usage'
+-- Performance optimizations completed successfully!
+-- All indexes created and tables analyzed

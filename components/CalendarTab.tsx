@@ -212,10 +212,39 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
       setWeatherError(null);
 
       // Extract just the city/town/suburb from the full address
-      // This regex looks for a city name after a comma and optional spaces, or takes the first part if no comma
+      let locationQuery = '';
       const locationParts = currentLocation.split(',').map(part => part.trim());
-      // Take the city/town part (second last part) or the first part if no comma
-      const locationQuery = locationParts.length > 1 ? locationParts[locationParts.length - 2] : locationParts[0];
+
+      if (locationParts.length > 1) {
+        // Address has commas, take the second-to-last part (usually the suburb/city)
+        locationQuery = locationParts[locationParts.length - 2];
+      } else {
+        // No commas - try to extract suburb from string like "32 Ancher St Taylor ACT"
+        const addressStr = locationParts[0];
+
+        // Australian state/territory codes
+        const australianStates = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
+
+        // Try to find state code and extract suburb before it
+        const words = addressStr.split(/\s+/);
+        const stateIndex = words.findIndex(word => australianStates.includes(word.toUpperCase()));
+
+        if (stateIndex > 0) {
+          // Found state code, take the word before it (suburb)
+          locationQuery = words[stateIndex - 1];
+        } else {
+          // No state code found, try to extract last 1-2 words (likely suburb)
+          // Skip street numbers and common street types
+          const streetTypes = ['ST', 'STREET', 'RD', 'ROAD', 'AVE', 'AVENUE', 'DR', 'DRIVE', 'CT', 'COURT', 'PL', 'PLACE'];
+          const meaningfulWords = words.filter(word => {
+            const upper = word.toUpperCase();
+            return isNaN(Number(word)) && !streetTypes.includes(upper);
+          });
+
+          // Take last 1-2 meaningful words as the suburb/city
+          locationQuery = meaningfulWords.slice(-2).join(' ');
+        }
+      }
 
       if (!locationQuery) {
         setIsWeatherLoading(false);
