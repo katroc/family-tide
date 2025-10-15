@@ -130,24 +130,30 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
     try {
       console.log('Attempting to join family with data:', familyData);
-      
-      // Here we would call a service method to join the family
-      // For now, let's simulate the process
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      // In a real implementation, this would:
-      // 1. Validate the invite code with Supabase
-      // 2. Add the current user to the family
-      // 3. Fetch family details
-      
-      // For now, we'll just pass the data to the parent
+
+      // Use the Supabase service to join the family
+      const joinResult = await supabaseService.joinFamilyByInvite(familyData.inviteCode, 'child');
+
+      if (!joinResult.success) {
+        throw new Error(joinResult.error || 'Failed to join family');
+      }
+
+      console.log('✅ Successfully joined family:', joinResult.family);
+
+      // Enhance the family data with the actual result from Supabase
+      const enhancedFamilyData = {
+        ...familyData,
+        familyId: joinResult.family?.id || familyData.familyId,
+        familyName: joinResult.family?.name || familyData.familyName
+      };
+
       stopScanning();
-      onJoinFamily(familyData);
+      onJoinFamily(enhancedFamilyData);
       onClose();
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Error joining family:', error);
-      setError('Failed to join family. Please check the invite code and try again.');
+      setError(error.message || 'Failed to join family. Please check the invite code and try again.');
     } finally {
       setIsJoining(false);
     }

@@ -208,14 +208,6 @@ export class SupabaseDataService {
   async addFamilyMember(member: NewFamilyMember): Promise<FamilyMember> {
     const familyId = this.ensureFamilyContext();
     try {
-      // Only allow roles permitted by the DB constraint
-      const allowedRoles = ['Mum', 'Dad', 'Child', 'Teen', 'Grandma', 'Grandad', 'Pet', 'Other'];
-      let roleValue = (member.role || '').trim();
-      console.log('Adding member with role:', JSON.stringify(roleValue));
-      if (!allowedRoles.includes(roleValue)) {
-        roleValue = 'Other';
-        console.log('Role not allowed, defaulting to:', roleValue);
-      }
       const { data, error } = await supabase
         .from('family_members')
         .insert([
@@ -223,7 +215,7 @@ export class SupabaseDataService {
             family_id: familyId,
             name: member.name,
             initial: member.initial,
-            role: roleValue,
+            role: member.role || 'Other',
             color: member.color,
             nickname: member.nickname || null,
             dob: member.dob || null,
@@ -237,7 +229,7 @@ export class SupabaseDataService {
       return {
         id: data.id,
         ...member,
-        role: roleValue,
+        role: data.role,
         points: data.points || 0
       };
     } catch (error) {

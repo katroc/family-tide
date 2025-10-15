@@ -28,7 +28,11 @@ const RoutinesTab: React.FC<RoutinesTabProps> = ({
 
   const getEligibleMembers = (routine: Routine): FamilyMember[] => {
     // Ensure appliesToMemberIds exists before filtering
-    return familyMembers.filter(member => routine.appliesToMemberIds && routine.appliesToMemberIds.includes(member.id));
+    // appliesToMemberIds can contain either member IDs or names depending on source
+    return familyMembers.filter(member =>
+      routine.appliesToMemberIds &&
+      (routine.appliesToMemberIds.includes(member.id) || routine.appliesToMemberIds.includes(member.name))
+    );
   };
 
   return (

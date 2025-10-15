@@ -153,10 +153,9 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       // For now, we'll use the existing dataService call and ensure it sets the family context.
 
       const joinResult = await dataService.joinFamilyWithInviteCode(inviteCode);
-      
-      // joinFamilyWithInviteCode should ideally set the familyId in dataService internally upon success
-      // and/or return the new familyId.
-      const joinedFamilyId = joinResult?.familyId || (joinResult?.family as any)?.id || familyData?.familyId;
+
+      // joinFamilyWithInviteCode returns { id, name, address }
+      const joinedFamilyId = joinResult?.id || familyData?.familyId;
 
       if (!joinedFamilyId) {
         console.error('❌ Error joining family: No family ID returned or found in response.', joinResult, familyData);
@@ -165,7 +164,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
 
       console.log('✅ Successfully joined family, completing setup with family ID:', joinedFamilyId);
       dataService.setCurrentFamilyId(joinedFamilyId);
-      await dataService.initialize(); 
+      await dataService.initialize();
       onComplete(joinedFamilyId);
     } catch (error: any) {
       console.error('❌ Error joining family:', error);

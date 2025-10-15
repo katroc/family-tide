@@ -38,7 +38,11 @@ const EditChoreModal: React.FC<EditChoreModalProps> = ({
   };
 
   const choreIsOverdue = isOverdue(editedChore.dueDate) && !editedChore.completed;
-  const assignedMember = familyMembers.find(m => m.name === editedChore.assignedTo);
+  // assignedTo is an array, but we only use the first member for single assignment
+  const assignedMemberName = Array.isArray(editedChore.assignedTo)
+    ? editedChore.assignedTo[0] || ''
+    : editedChore.assignedTo || '';
+  const assignedMember = familyMembers.find(m => m.name === assignedMemberName);
 
   if (!isOpen) return null;
 
@@ -90,8 +94,8 @@ const EditChoreModal: React.FC<EditChoreModalProps> = ({
                 Assigned To
               </label>
               <select
-                value={editedChore.assignedTo}
-                onChange={(e) => setEditedChore(prev => ({ ...prev, assignedTo: e.target.value }))}
+                value={assignedMemberName}
+                onChange={(e) => setEditedChore(prev => ({ ...prev, assignedTo: [e.target.value] }))}
                 className="w-full p-3 border border-slate-200 rounded-xl focus:border-teal-400 focus:outline-none bg-slate-50"
               >
                 {familyMembers.map(member => (
