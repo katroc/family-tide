@@ -50,7 +50,7 @@ export const QRCodeShareModal: React.FC<QRCodeShareModalProps> = ({
       
       setShareData(data);
     } catch (error) {
-      console.error('Error generating share data:', error);
+      uiLogger.error('Error generating share data', error as Error);
     } finally {
       setIsGenerating(false);
     }
@@ -64,7 +64,7 @@ export const QRCodeShareModal: React.FC<QRCodeShareModalProps> = ({
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (error) {
-        console.error('Failed to copy to clipboard:', error);
+        uiLogger.error('Failed to copy to clipboard', error as Error);
       }
     }
   };

@@ -4,7 +4,9 @@ import { convertToHexColor } from '../utils/colorUtils';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import './react-datepicker-custom.css';
-import { setMinutes, setHours } from 'date-fns';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import FormField from './ui/FormField';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -94,137 +96,136 @@ const EventModal: React.FC<EventModalProps> = ({
     }
   }, [eventState, onSaveEvent]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-50 rounded-2xl p-6 w-full max-w-md sm:max-w-xl lg:max-w-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">{eventToEdit ? 'Edit Event' : 'Add New Event'}</h3>
-        <div className="space-y-3 sm:space-y-4">
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Event Title</label>
-            <input
-              type="text"
-              value={eventState.title}
-              onChange={(e) => handleChange('title', e.target.value)}
-              className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
-              placeholder="Enter event title"
-            />
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="flex-1">
-              <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Start Date & Time</label>
-              <DatePicker
-                selected={pickerDate}
-                onChange={handleDateChange}
-                showTimeSelect
-                timeIntervals={15}
-                dateFormat="yyyy-MM-dd h:mm aa"
-                className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
-                placeholderText="Select date and time"
-                minDate={new Date()}
-                autoComplete="off"
-                popperPlacement="bottom"
-                calendarClassName="rounded-xl shadow-lg border border-slate-200"
-                popperClassName="z-50"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">End Time</label>
-              <DatePicker
-                selected={pickerEndTime}
-                onChange={handleEndTimeChange}
-                showTimeSelect
-                showTimeSelectOnly
-                timeIntervals={15}
-                timeCaption="End Time"
-                dateFormat="HH:mm"
-                className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
-                placeholderText="Select end time"
-                autoComplete="off"
-                popperPlacement="bottom"
-                calendarClassName="rounded-xl shadow-lg border border-slate-200"
-                popperClassName="z-50"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Attendees</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border border-slate-200 rounded-lg bg-slate-100/50 max-h-32 overflow-y-auto">
-              {familyMembers.map(member => {
-                const isSelected = eventState.attendees.includes(member.name);
-                const memberColor = getMemberColor(member.name);
-                
-                return (
-                  <button
-                    key={member.id}
-                    onClick={() => toggleAttendee(member.name)}
-                    className={`p-2 rounded-lg text-xs sm:text-sm w-full text-left transition-all
-                      ${isSelected 
-                        ? 'text-white font-semibold shadow-md transform scale-[1.02]' 
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-600 hover:scale-[1.02]'
-                      }
-                    `}
-                    style={isSelected ? { 
-                      backgroundColor: memberColor,
-                      border: `2px solid ${memberColor}`,
-                      boxShadow: `0 0 0 1px white, 0 0 0 3px ${memberColor}`,
-                      color: '#ffffff'
-                    } : {}}
-                    aria-label={`${isSelected ? 'Remove' : 'Add'} ${member.name} as attendee`}
-                    aria-pressed={isSelected}
-                  >
-                    {member.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Event Color</label>
-            <div className="flex flex-wrap gap-2">
-              {eventColors.map((color, index) => {
-                // Use the color utility to get consistent hex values
-                const hexColor = convertToHexColor(color);
-                const colorName = color.replace('bg-', '').replace('-200', '');
-                
-                return (
-                  <button
-                    key={color}
-                    onClick={() => handleChange('color', color)}
-                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all
-                      ${eventState.color === color
-                        ? 'border-slate-700 scale-110 ring-2 ring-offset-1 ring-slate-700'
-                        : 'border-slate-200 hover:scale-105'
-                      }
-                    `}
-                    style={{ backgroundColor: hexColor }}
-                    aria-label={`Select color ${colorName}`}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-5 sm:mt-6">
-          <button
-            onClick={handleSave}
-            className="flex-1 bg-teal-500 text-white py-3 px-4 sm:py-4 sm:px-6 rounded-xl hover:bg-teal-600 transition-colors font-medium text-sm sm:text-base min-h-[44px] sm:min-h-[48px]"
-          >
-            {eventToEdit ? 'Save Changes' : 'Add Event'}
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 bg-slate-300 text-slate-600 py-3 px-4 sm:py-4 sm:px-6 rounded-xl hover:bg-slate-400 transition-colors font-medium text-sm sm:text-base min-h-[44px] sm:min-h-[48px]"
-          >
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={eventToEdit ? 'Edit Event' : 'Add New Event'}
+      size="xl"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
+          </Button>
+          <Button onClick={handleSave}>
+            Save Event
+          </Button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <FormField label="Event Title" htmlFor="eventTitle" required>
+          <input
+            id="eventTitle"
+            type="text"
+            value={eventState.title}
+            onChange={(e) => handleChange('title', e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-slate-100/50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+            placeholder="Enter event title"
+          />
+        </FormField>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Start Date & Time" htmlFor="eventStart" required>
+            <DatePicker
+              id="eventStart"
+              selected={pickerDate}
+              onChange={handleDateChange}
+              showTimeSelect
+              timeIntervals={15}
+              dateFormat="yyyy-MM-dd h:mm aa"
+              className="w-full rounded-lg border border-slate-200 bg-slate-100/50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+              placeholderText="Select date and time"
+              minDate={new Date()}
+              autoComplete="off"
+              popperPlacement="bottom"
+              calendarClassName="rounded-xl border border-slate-200 shadow-lg"
+              popperClassName="z-50"
+            />
+          </FormField>
+
+          <FormField label="End Time" htmlFor="eventEnd">
+            <DatePicker
+              id="eventEnd"
+              selected={pickerEndTime}
+              onChange={handleEndTimeChange}
+              showTimeSelect
+              showTimeSelectOnly
+              timeIntervals={15}
+              timeCaption="End Time"
+              dateFormat="HH:mm"
+              className="w-full rounded-lg border border-slate-200 bg-slate-100/50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+              placeholderText="Select end time"
+              autoComplete="off"
+              popperPlacement="bottom"
+              calendarClassName="rounded-xl border border-slate-200 shadow-lg"
+              popperClassName="z-50"
+            />
+          </FormField>
+        </div>
+
+        <FormField label="Attendees" htmlFor="eventAttendees">
+          <div
+            id="eventAttendees"
+            className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-100/50 p-2 sm:grid-cols-3"
+          >
+            {familyMembers.map(member => {
+              const isSelected = eventState.attendees.includes(member.name);
+              const memberColor = getMemberColor(member.name);
+
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => toggleAttendee(member.name)}
+                  className={`w-full rounded-lg p-2 text-left text-xs transition-all sm:text-sm ${
+                    isSelected
+                      ? 'font-semibold text-white shadow-md'
+                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
+                  style={
+                    isSelected
+                      ? {
+                          backgroundColor: memberColor,
+                          border: `2px solid ${memberColor}`,
+                          boxShadow: `0 0 0 1px #ffffff, 0 0 0 3px ${memberColor}`
+                        }
+                      : {}
+                  }
+                  aria-pressed={isSelected}
+                >
+                  {member.name}
+                </button>
+              );
+            })}
+          </div>
+        </FormField>
+
+        <FormField label="Event Color" htmlFor="eventColor">
+          <div id="eventColor" className="flex flex-wrap gap-2">
+            {eventColors.map(color => {
+              const hexColor = convertToHexColor(color);
+              const isSelected = eventState.color === color;
+              return (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => handleChange('color', color)}
+                  className={`h-10 w-10 rounded-full border-2 transition-all ${
+                    isSelected
+                      ? 'border-slate-700 scale-110 ring-2 ring-offset-1 ring-slate-700'
+                      : 'border-slate-200 hover:scale-105'
+                  }`}
+                  style={{ backgroundColor: hexColor }}
+                  aria-pressed={isSelected}
+                  aria-label={`Select color ${color}`}
+                />
+              );
+            })}
+          </div>
+        </FormField>
       </div>
-    </div>
+    </Modal>
   );
 };
 

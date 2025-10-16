@@ -2,11 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Chore, FamilyMember, ChoreType } from '../types';
 import { convertToHexColor } from '../utils/colorUtils';
 import { getIcon } from '../utils/iconUtils';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import FormField from './ui/FormField';
 
 interface AddChoreModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveChore: (newChoreData: Omit<Chore, 'id' | 'completed'>) => void;
+  onSaveChore: (choreData: Omit<Chore, 'id' | 'completed'> | Chore) => void;
   familyMembers: FamilyMember[];
   defaultNewChoreState: Omit<Chore, 'id' | 'completed'>;
   choreTypes: ChoreType[];
@@ -94,88 +97,119 @@ const AddChoreModal: React.FC<AddChoreModalProps> = ({
     onSaveChore(newChore);
   }, [newChore, onSaveChore]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-50 rounded-2xl p-6 w-full max-w-md sm:max-w-lg border border-slate-200 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Add New Chore</h3>
-        <div className="space-y-3 sm:space-y-4">
-          <div>
-            <label htmlFor="choreType" className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Chore Type</label>
-            <select
-              id="choreType"
-              value={selectedChoreTypeId}
-              onChange={(e) => handleChoreTypeChange(e.target.value)}
-              className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg focus:border-teal-400 focus:outline-none bg-slate-100/50 text-sm sm:text-base text-slate-600"
-              required
-            >
-              {choreTypes.map(type => (
-                <option key={type.id} value={type.id}>
-                  {getIcon(type.icon)} {type.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Assign To</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border border-slate-200 rounded-lg bg-slate-100/50">
-              {familyMembers.map(member => {
-                const isSelected = newChore.assignedTo.includes(member.name);
-                const memberColor = getMemberColor(member.name);
-                
-                return (
-                  <button
-                    key={`${member.id}-${member.name}`}
-                    type="button"
-                    onClick={() => toggleAssignedTo(member.name)}
-                    className={`p-2 rounded-lg text-xs sm:text-sm w-full text-left transition-all
-                      ${isSelected 
-                        ? 'text-white font-semibold shadow-md transform scale-[1.02]' 
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-600 hover:scale-[1.02]'
-                      }
-                    `}
-                    style={isSelected ? { 
-                      backgroundColor: memberColor,
-                      border: `2px solid ${memberColor}`,
-                      boxShadow: `0 0 0 1px white, 0 0 0 3px ${memberColor}`,
-                      color: '#ffffff' // Ensure text is white for better contrast
-                    } : {}}
-                    aria-label={`${isSelected ? 'Unassign' : 'Assign'} ${member.name}`}
-                    aria-pressed={isSelected}
-                  >
-                    {member.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {newChore.icon && selectedChoreTypeId && (
-            <div className="mt-2">
-                <span className="text-xs sm:text-sm font-medium text-slate-600">Icon: </span>
-                <span className="text-xl">{getIcon(newChore.icon)}</span>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-5 sm:mt-6">
-          <button
-            onClick={handleSave}
-            className="flex-1 bg-teal-500 text-white py-3 px-4 sm:py-4 sm:px-6 rounded-xl hover:bg-teal-600 transition-colors font-medium text-sm sm:text-base min-h-[44px] sm:min-h-[48px]"
-          >
-            Add Chore
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 bg-slate-300 text-slate-600 py-3 px-4 sm:py-4 sm:px-6 rounded-xl hover:bg-slate-400 transition-colors font-medium text-sm sm:text-base min-h-[44px] sm:min-h-[48px]"
-          >
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add New Chore"
+      size="lg"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
+          </Button>
+          <Button onClick={handleSave}>
+            Add Chore
+          </Button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <FormField label="Chore Type" htmlFor="choreType" required>
+          <select
+            id="choreType"
+            value={selectedChoreTypeId}
+            onChange={(e) => handleChoreTypeChange(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-slate-100/50 p-3 text-sm text-slate-600 focus:border-teal-400 focus:outline-none"
+          >
+            <option value="">Custom chore</option>
+            {choreTypes.map(type => (
+              <option key={type.id} value={type.id}>
+                {getIcon(type.icon)} {type.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label="Chore Title" htmlFor="choreTitle" required>
+          <input
+            id="choreTitle"
+            type="text"
+            value={newChore.title}
+            onChange={(event) => handleChange('title', event.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+          />
+        </FormField>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Points" htmlFor="chorePoints" required>
+            <input
+              id="chorePoints"
+              type="number"
+              min={0}
+              value={newChore.points}
+              onChange={(event) => handleChange('points', Number(event.target.value))}
+              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+            />
+          </FormField>
+
+          <FormField label="Due Date" htmlFor="choreDueDate" required>
+            <input
+              id="choreDueDate"
+              type="date"
+              value={newChore.dueDate}
+              onChange={(event) => handleChange('dueDate', event.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+            />
+          </FormField>
+        </div>
+
+        <FormField label="Assign To" htmlFor="assignTo">
+          <div
+            id="assignTo"
+            className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-100/50 p-2 sm:grid-cols-3"
+          >
+            {familyMembers.map(member => {
+              const isSelected = newChore.assignedTo.includes(member.name);
+              const memberColor = getMemberColor(member.name);
+
+              return (
+                <button
+                  key={`${member.id}-${member.name}`}
+                  type="button"
+                  onClick={() => toggleAssignedTo(member.name)}
+                  className={`w-full rounded-lg p-2 text-left text-xs transition-all sm:text-sm ${
+                    isSelected
+                      ? 'font-semibold text-white shadow-md'
+                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
+                  style={
+                    isSelected
+                      ? {
+                          backgroundColor: memberColor,
+                          border: `2px solid ${memberColor}`,
+                          boxShadow: `0 0 0 1px #ffffff, 0 0 0 3px ${memberColor}`
+                        }
+                      : {}
+                  }
+                  aria-label={`${isSelected ? 'Unassign' : 'Assign'} ${member.name}`}
+                  aria-pressed={isSelected}
+                >
+                  {member.name}
+                </button>
+              );
+            })}
+          </div>
+        </FormField>
+
+        {newChore.icon && (
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <span className="font-medium">Icon:</span>
+            <span className="text-xl">{getIcon(newChore.icon)}</span>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 };
 

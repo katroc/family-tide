@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { authService } from '../services/authService';
 import { supabaseService } from '../supabaseService';
 import { dataService } from '../dataService';
+import { authLogger } from '../utils/logger';
 
 export interface UseAuthReturn {
   isCheckingAuth: boolean;
@@ -28,15 +29,15 @@ export function useAuth(): UseAuthReturn {
 
     const checkSetup = async (retryCount = 0) => {
       try {
-        console.log('🔍 [useAuth] Checking if setup is complete... (attempt:', retryCount + 1, ')');
+        authLogger.debug('Checking if setup is complete', { attempt: retryCount + 1 });
         await new Promise(resolve => setTimeout(resolve, 100)); // Ensure auth state propagates
 
         const setupStatus = await authService.isSetupComplete();
-        console.log('🔍 [useAuth] Setup completion result (boolean):', setupStatus);
+        authLogger.debug('Setup completion result', { setupStatus });
 
         if (mounted) {
           if (setupStatus === true) {
-            console.log('✅ [useAuth] Setup reported as complete. Attempting to load current family ID.');
+            authLogger.info('Setup complete - loading family ID');
             try {
               const userResult = await supabaseService.getCurrentUser();
 
@@ -48,39 +49,39 @@ export function useAuth(): UseAuthReturn {
                   const primaryFamilyId = familiesResult.families[0].family?.id;
 
                   if (primaryFamilyId) {
-                    console.log('✅ [useAuth] Found primary family ID:', primaryFamilyId);
+                    authLogger.info('Found primary family', { familyId: primaryFamilyId });
                     dataService.setCurrentFamilyId(primaryFamilyId);
                     await dataService.initialize();
                     setCurrentFamilyId(primaryFamilyId);
                     setShowSetupWizard(false);
                   } else {
-                    console.warn('⚠️ [useAuth] Setup complete, but no primary family ID found. Showing wizard.');
+                    authLogger.warn('Setup complete but no primary family ID found - showing wizard');
                     setShowSetupWizard(true);
                   }
                 } else {
-                  console.warn('⚠️ [useAuth] Setup complete, but no families found for user. Showing wizard.');
+                  authLogger.warn('Setup complete but no families found for user - showing wizard');
                   setShowSetupWizard(true);
                 }
               } else {
-                console.log('👤 [useAuth] No authenticated user found. Showing wizard.');
+                authLogger.info('No authenticated user found - showing wizard');
                 setShowSetupWizard(true);
               }
             } catch (e) {
-              console.error('❌ [useAuth] Error fetching family ID during setup check:', e);
+              authLogger.error('Error fetching family ID during setup check', e as Error);
               setShowSetupWizard(true);
             }
           } else {
-            console.log('⚠️ [useAuth] Setup reported as not complete. Showing setup wizard.');
+            authLogger.info('Setup not complete - showing wizard');
             setShowSetupWizard(true);
           }
           setIsCheckingAuth(false);
         }
       } catch (error) {
-        console.error('❌ [useAuth] Error checking setup completion:', error);
+        authLogger.error('Error checking setup completion', error as Error, { retryCount });
 
         // Retry once if this is the first attempt
         if (retryCount === 0 && mounted) {
-          console.log('🔄 [useAuth] Retrying setup check in 1 second...');
+          authLogger.debug('Retrying setup check in 1 second');
           setTimeout(() => {
             if (mounted) {
               checkSetup(1);
@@ -90,7 +91,7 @@ export function useAuth(): UseAuthReturn {
         }
 
         if (mounted) {
-          console.log('🔄 [useAuth] Defaulting to setup wizard due to persistent error');
+          authLogger.warn('Defaulting to setup wizard due to persistent error');
           setShowSetupWizard(true);
           setIsCheckingAuth(false);
         }
@@ -112,7 +113,7 @@ export function useAuth(): UseAuthReturn {
       await dataService.initialize();
       setCurrentFamilyId(newFamilyId);
     } catch (error) {
-      console.error('❌ [useAuth] Error during setup completion:', error);
+      authLogger.error('Error during setup completion', error as Error, { familyId: newFamilyId });
       throw error;
     }
   }, []);

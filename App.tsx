@@ -1,13 +1,16 @@
 import React, { useEffect, useCallback } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { dataService } from './dataService';
 import SetupWizard from './components/SetupWizard';
 import { RealtimeProvider } from './components/RealtimeProvider';
 import { PerformanceMonitor } from './components/PerformanceMonitor';
 import SplashScreen from './components/SplashScreen';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './hooks/useAuth';
 import { FamilyDataProvider, useFamilyData } from './hooks/useFamilyData';
 import { ModalStateProvider, useModalState } from './hooks/useModalState';
 import { useSupabaseSync } from './hooks/useSupabaseSync';
+import { uiLogger, dataLogger } from './utils/logger';
 import {
   FamilyMember,
   NewFamilyMember,
@@ -77,6 +80,7 @@ const AppContent: React.FC = () => {
     setEvents,
     setRewards,
     setRoutines,
+    setChoreTypes,
     setFamilyDetails,
     setDailyRoutineProgress,
     loadData,
@@ -98,7 +102,8 @@ const AppContent: React.FC = () => {
     setChores,
     setEvents,
     setRewards,
-    setRoutines
+    setRoutines,
+    setChoreTypes
   });
 
 
@@ -108,7 +113,7 @@ const AppContent: React.FC = () => {
       await handleAuthSetupComplete(newFamilyId);
       await loadData(currentDate);
     } catch (error) {
-      console.error('Error loading data after setup:', error);
+      dataLogger.error('Error loading data after setup', error as Error, { familyId: newFamilyId });
     }
   }, [handleAuthSetupComplete, loadData, currentDate]);
 
@@ -149,10 +154,10 @@ const AppContent: React.FC = () => {
   // Load data when setup is complete AND auth check is done
   useEffect(() => {
     if (!isCheckingAuth && !showSetupWizard) {
-      console.log('🚀 Auth complete and setup not needed - loading family data...');
+      uiLogger.info('Auth complete - loading family data');
       loadData(currentDate);
     } else {
-      console.log('⏸️ Waiting for auth/setup:', { isCheckingAuth, showSetupWizard });
+      uiLogger.debug('Waiting for auth/setup', { isCheckingAuth, showSetupWizard });
     }
   }, [isCheckingAuth, showSetupWizard, currentDate, loadData]);
 
@@ -161,39 +166,30 @@ const AppContent: React.FC = () => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.shiftKey && event.key === 'P') {
         event.preventDefault();
-        setIsPerformanceMonitorOpen(true);
-        console.log('🎛️ Performance monitor opened via hotkey');
+        openPerformanceMonitor();
+        uiLogger.debug('Performance monitor opened via hotkey');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Handler for tab change
-  const handleTabChange = (tabId: TabId) => {
-    setActiveTab(tabId);
-    dataService.saveActiveTab(tabId).catch(console.error);
-  };
+  }, [openPerformanceMonitor]);
 
   // Member UI handlers
   const handleAddMember = () => {
-    setEditingMember(null);
-    setIsAddingMember(true);
+    openAddMember();
   };
 
   const handleEditMember = (member: FamilyMember) => {
-    setEditingMember(member);
-    setIsAddingMember(true);
+    openEditMember(member);
   };
 
   const handleMemberSave = async (member: FamilyMember | NewFamilyMember) => {
     try {
       await handleSaveMember(member);
-      setIsAddingMember(false);
-      setEditingMember(null);
+      closeMemberModal();
     } catch (error) {
-      console.error('Error in handleMemberSave:', error);
+      uiLogger.error('Error in member save handler', error as Error);
     }
   };
 
@@ -201,18 +197,17 @@ const AppContent: React.FC = () => {
     try {
       await handleDeleteMember(id);
     } catch (error) {
-      console.error('Error in handleMemberDelete:', error);
+      uiLogger.error('Error in member delete handler', error as Error, { memberId: id });
     }
   };
 
   // Chore UI handlers
   const handleAddChore = () => {
-    setIsAddingChore(true);
+    openAddChoreModal();
   };
 
   const handleEditChore = (chore: Chore) => {
-    setEditingChore(chore);
-    setIsEditingChore(true);
+    openEditChoreModal(chore);
   };
 
   // Family detail save with UI state management
@@ -253,59 +248,69 @@ const AppContent: React.FC = () => {
     icon: 'gift'
   };
 
-  // Render the current tab
+  // Render the current tab with error boundary
   const renderTab = () => {
     switch (activeTab) {
       case 'family':
         return (
-          <FamilyTab
-            familyMembers={familyMembers}
-            familyDetails={familyDetails}
-            setFamilyDetails={setFamilyDetails}
-            familyPhoto={familyPhoto}
-            isEditingFamily={isEditingFamily}
-            setIsEditingFamily={setIsEditingFamily}
-            onNewPhotoSelected={handleNewPhotoSelected}
-            saveFamilyDetails={handleSaveFamilyDetails}
-            onEditMember={handleEditMember}
-            onDeleteMember={handleMemberDelete}
-            onAddMember={handleAddMember}
-          />
+          <ErrorBoundary section="Family Tab" resetKeys={[activeTab]}>
+            <FamilyTab
+              familyMembers={familyMembers}
+              familyDetails={familyDetails}
+              setFamilyDetails={setFamilyDetails}
+              familyPhoto={familyPhoto}
+              isEditingFamily={isEditingFamily}
+              setIsEditingFamily={setIsEditingFamily}
+              onNewPhotoSelected={handleNewPhotoSelected}
+              saveFamilyDetails={handleSaveFamilyDetails}
+              onEditMember={handleEditMember}
+              onDeleteMember={handleMemberDelete}
+              onAddMember={handleAddMember}
+            />
+          </ErrorBoundary>
         );
       case 'chores':
         return (
-          <ChoresTab 
-            chores={chores}
-            familyMembers={familyMembers}
-            onAddChore={handleAddChore}
-            onCompleteChore={handleCompleteChore}
-            onEditChore={handleEditChore}
-            onManageChoreTypes={() => setIsManagingChoreTypes(true)}
-            rewards={rewards}
-            onAddReward={() => setIsAddingReward(true)}
-            getMemberByName={getMemberByName}
-          />
+          <ErrorBoundary section="Chores Tab" resetKeys={[activeTab]}>
+            <ChoresTab
+              chores={chores}
+              familyMembers={familyMembers}
+              onAddChore={handleAddChore}
+              onCompleteChore={handleCompleteChore}
+              onEditChore={handleEditChore}
+              onManageChoreTypes={openManageChoreTypes}
+              rewards={rewards}
+              onAddReward={openAddRewardModal}
+              getMemberByName={getMemberByName}
+            />
+          </ErrorBoundary>
         );
       case 'routines':
         return (
-          <RoutinesTab 
-            routines={routines}
-            familyMembers={familyMembers}
-            dailyRoutineProgress={dailyRoutineProgress}
-            onToggleRoutineStep={handleRoutineStepToggle}
-            currentDate={currentDate}
-            onManageRoutines={() => setIsManagingRoutines(true)}
-            getMemberById={getMemberById}
-          />
+          <ErrorBoundary section="Routines Tab" resetKeys={[activeTab]}>
+            <RoutinesTab
+              routines={routines}
+              familyMembers={familyMembers}
+              dailyRoutineProgress={dailyRoutineProgress}
+              onToggleRoutineStep={handleRoutineStepToggle}
+              currentDate={currentDate}
+              onManageRoutines={openManageRoutines}
+              getMemberById={getMemberById}
+            />
+          </ErrorBoundary>
         );
       case 'calendar':
-        return <CalendarTab 
-                 events={events} 
-                 familyMembers={familyMembers} 
-                 onAddEvent={() => setIsAddingEvent(true)} 
-                 currentLocation={familyDetails.address || null} 
-                 onEventsUpdated={setEvents}
-               />;
+        return (
+          <ErrorBoundary section="Calendar Tab" resetKeys={[activeTab]}>
+            <CalendarTab
+              events={events}
+              familyMembers={familyMembers}
+              onAddEvent={openEventModal}
+              currentLocation={familyDetails.address || null}
+              onEventsUpdated={setEvents}
+            />
+          </ErrorBoundary>
+        );
       default:
         return <div className="p-8 text-center text-gray-600">Unknown Tab</div>;
     }
@@ -343,13 +348,10 @@ const AppContent: React.FC = () => {
         />
 
         {/* Modals */}
-        {(isAddingMember || editingMember) && (
+        {isMemberModalOpen && (
           <EditMemberModal
-            isOpen={isAddingMember || !!editingMember}
-            onClose={() => {
-              setIsAddingMember(false);
-              setEditingMember(null);
-            }}
+            isOpen={isMemberModalOpen}
+            onClose={closeMemberModal}
             memberToEdit={editingMember}
             onSaveMember={handleMemberSave}
             availableColors={AVAILABLE_COLORS}
@@ -357,10 +359,10 @@ const AppContent: React.FC = () => {
           />
         )}
 
-        {isAddingChore && (
+        {isAddChoreModalOpen && (
         <AddChoreModal
-          isOpen={isAddingChore}
-          onClose={() => setIsAddingChore(false)}
+          isOpen={isAddChoreModalOpen}
+          onClose={closeChoreModals}
           onSaveChore={handleSaveChore}
           familyMembers={familyMembers}
           defaultNewChoreState={DEFAULT_NEW_CHORE_STATE}
@@ -368,13 +370,10 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {isEditingChore && editingChore && (
+      {isEditChoreModalOpen && editingChore && (
         <EditChoreModal
-          isOpen={isEditingChore}
-          onClose={() => {
-            setIsEditingChore(false);
-            setEditingChore(null);
-          }}
+          isOpen={isEditChoreModalOpen}
+          onClose={closeChoreModals}
           onSaveChore={handleSaveChore}
           onDeleteChore={handleDeleteChore}
           chore={editingChore}
@@ -383,24 +382,24 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {isAddingReward && (
+      {isAddRewardModalOpen && (
         <AddRewardModal
-          isOpen={isAddingReward}
-          onClose={() => setIsAddingReward(false)}
+          isOpen={isAddRewardModalOpen}
+          onClose={closeAddRewardModal}
           onSaveReward={async (reward) => {
             const newReward = await dataService.addReward(reward);
             setRewards(prev => [...prev, newReward]);
-            setIsAddingReward(false);
+            closeAddRewardModal();
           }}
           defaultNewRewardState={DEFAULT_NEW_REWARD_STATE}
           availableIcons={[]}
         />
       )}
 
-      {isManagingChoreTypes && (
+      {isManageChoreTypesOpen && (
         <ManageChoreTypesModal
-          isOpen={isManagingChoreTypes}
-          onClose={() => setIsManagingChoreTypes(false)}
+          isOpen={isManageChoreTypesOpen}
+          onClose={closeManageChoreTypes}
           choreTypes={choreTypes}
           onSaveChoreType={async (choreType) => {
             const updatedTypes = await dataService.updateChoreTypes([...choreTypes, choreType]);
@@ -409,10 +408,10 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {isManagingRoutines && (
+      {isManageRoutinesOpen && (
         <ManageRoutinesModal
-          isOpen={isManagingRoutines}
-          onClose={() => setIsManagingRoutines(false)}
+          isOpen={isManageRoutinesOpen}
+          onClose={closeManageRoutines}
           routines={routines}
           familyMembers={familyMembers}
           onSaveRoutine={async (routine) => {
@@ -427,19 +426,19 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {isAddingEvent && (
+      {isEventModalOpen && (
         <EventModal
-          isOpen={isAddingEvent}
-          onClose={() => setIsAddingEvent(false)}
+          isOpen={isEventModalOpen}
+          onClose={closeEventModal}
           onSaveEvent={async (event) => {
             try {
-              console.log('Saving event:', event);
+              dataLogger.debug('Saving event', { title: event.title, date: event.date });
               const newEvent = await dataService.addEvent(event);
-              console.log('Event saved successfully:', newEvent);
+              dataLogger.info('Event saved successfully', { eventId: newEvent.id });
               setEvents(prev => [...prev, newEvent]);
-              setIsAddingEvent(false);
+              closeEventModal();
             } catch (error) {
-              console.error('Error saving event:', error);
+              dataLogger.error('Error saving event', error as Error);
               alert('Failed to save event. Please try again.');
             }
           }}
@@ -457,10 +456,23 @@ const AppContent: React.FC = () => {
       {/* Performance Monitor (Ctrl+Shift+P) */}
       <PerformanceMonitor
         isOpen={isPerformanceMonitorOpen}
-        onClose={() => setIsPerformanceMonitorOpen(false)}
+        onClose={closePerformanceMonitor}
       />
       </div>
     </RealtimeProvider>
   );
 };
+
+const queryClient = new QueryClient();
+
+const App: React.FC = () => (
+  <QueryClientProvider client={queryClient}>
+    <FamilyDataProvider>
+      <ModalStateProvider>
+        <AppContent />
+      </ModalStateProvider>
+    </FamilyDataProvider>
+  </QueryClientProvider>
+);
+
 export default App;

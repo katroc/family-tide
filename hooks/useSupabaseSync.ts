@@ -1,19 +1,22 @@
-import { useCallback } from 'react';
+import { useCallback, Dispatch, SetStateAction } from 'react';
 import { dataService } from '../dataService';
+import { syncLogger } from '../utils/logger';
 import {
   FamilyMember,
   Chore,
   EventItem,
   Reward,
-  Routine
+  Routine,
+  ChoreType
 } from '../types';
 
 export interface UseSupabaseSyncProps {
-  setFamilyMembers: React.Dispatch<React.SetStateAction<FamilyMember[]>>;
-  setChores: React.Dispatch<React.SetStateAction<Chore[]>>;
-  setEvents: React.Dispatch<React.SetStateAction<EventItem[]>>;
-  setRewards: React.Dispatch<React.SetStateAction<Reward[]>>;
-  setRoutines: React.Dispatch<React.SetStateAction<Routine[]>>;
+  setFamilyMembers: Dispatch<SetStateAction<FamilyMember[]>>;
+  setChores: Dispatch<SetStateAction<Chore[]>>;
+  setEvents: Dispatch<SetStateAction<EventItem[]>>;
+  setRewards: Dispatch<SetStateAction<Reward[]>>;
+  setRoutines: Dispatch<SetStateAction<Routine[]>>;
+  setChoreTypes?: Dispatch<SetStateAction<ChoreType[]>>;
 }
 
 export interface UseSupabaseSyncReturn {
@@ -33,7 +36,8 @@ export function useSupabaseSync(props: UseSupabaseSyncProps): UseSupabaseSyncRet
     setChores,
     setEvents,
     setRewards,
-    setRoutines
+    setRoutines,
+    setChoreTypes
   } = props;
 
   const handleRealtimeDataUpdate = useCallback(async (
@@ -41,7 +45,7 @@ export function useSupabaseSync(props: UseSupabaseSyncProps): UseSupabaseSyncRet
     eventType: string,
     record: any
   ) => {
-    console.log(`🔄 [useSupabaseSync] Handling real-time update for ${table}:`, eventType, record);
+    syncLogger.debug('Handling real-time update', { table, eventType, recordId: record?.id });
 
     try {
       // Refresh specific data based on the table that was updated
@@ -49,41 +53,48 @@ export function useSupabaseSync(props: UseSupabaseSyncProps): UseSupabaseSyncRet
         case 'family_members':
           const updatedMembers = await dataService.getFamilyMembers();
           setFamilyMembers(updatedMembers);
-          console.log(`✅ [useSupabaseSync] Updated ${updatedMembers.length} family members`);
+          syncLogger.info('Updated family members', { count: updatedMembers.length });
           break;
 
         case 'chores':
           const updatedChores = await dataService.getChores();
           setChores(updatedChores);
-          console.log(`✅ [useSupabaseSync] Updated ${updatedChores.length} chores`);
+          syncLogger.info('Updated chores', { count: updatedChores.length });
           break;
 
         case 'events':
           const updatedEvents = await dataService.getEvents();
           setEvents(updatedEvents);
-          console.log(`✅ [useSupabaseSync] Updated ${updatedEvents.length} events`);
+          syncLogger.info('Updated events', { count: updatedEvents.length });
           break;
 
         case 'rewards':
           const updatedRewards = await dataService.getRewards();
           setRewards(updatedRewards);
-          console.log(`✅ [useSupabaseSync] Updated ${updatedRewards.length} rewards`);
+          syncLogger.info('Updated rewards', { count: updatedRewards.length });
           break;
 
         case 'routines':
           const updatedRoutines = await dataService.getRoutines();
           setRoutines(updatedRoutines);
-          console.log(`✅ [useSupabaseSync] Updated ${updatedRoutines.length} routines`);
+          syncLogger.info('Updated routines', { count: updatedRoutines.length });
+          break;
+        case 'chore_types':
+          if (setChoreTypes) {
+            const updatedTypes = await dataService.getChoreTypes();
+            setChoreTypes(updatedTypes);
+            syncLogger.info('Updated chore types', { count: updatedTypes.length });
+          }
           break;
 
         default:
-          console.log(`ℹ️ [useSupabaseSync] No specific handler for table: ${table}`);
+          syncLogger.debug('No specific handler for table', { table });
       }
     } catch (error) {
-      console.error(`❌ [useSupabaseSync] Error refreshing data for ${table}:`, error);
+      syncLogger.error('Error refreshing data after real-time update', error as Error, { table });
       // Don't throw - we don't want real-time sync errors to crash the app
     }
-  }, [setFamilyMembers, setChores, setEvents, setRewards, setRoutines]);
+  }, [setFamilyMembers, setChores, setEvents, setRewards, setRoutines, setChoreTypes]);
 
   return {
     handleRealtimeDataUpdate

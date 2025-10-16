@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Chore, FamilyMember, ChoreType } from '../types';
-import { X, Calendar, User, Star, AlertTriangle, Trash2 } from 'lucide-react';
+import { Calendar, User, Star, AlertTriangle, Trash2 } from 'lucide-react';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import FormField from './ui/FormField';
 
 interface EditChoreModalProps {
   isOpen: boolean;
@@ -44,147 +47,132 @@ const EditChoreModal: React.FC<EditChoreModalProps> = ({
     : editedChore.assignedTo || '';
   const assignedMember = familyMembers.find(m => m.name === assignedMemberName);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl p-6 w-full max-w-lg border border-slate-200 max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex justify-between items-start mb-6">
-          <h3 className="text-xl font-semibold text-slate-800">Edit Chore</h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <X size={20} className="text-slate-600" />
-          </button>
-        </div>
-
-        {/* Status Alerts */}
-        <div className="mb-6 space-y-3">
-          {choreIsOverdue && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2">
-              <AlertTriangle size={18} className="text-red-500" />
-              <span className="text-red-700 text-sm font-medium">This chore is overdue!</span>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Edit Chore"
+        size="lg"
+        footer={
+          <div className="flex justify-between gap-3">
+            <Button variant="ghost" onClick={() => setShowDeleteConfirm(true)} className="text-red-600" type="button">
+              <span className="flex items-center gap-2">
+                <Trash2 size={16} />
+                Delete
+              </span>
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave}>
+                Save Changes
+              </Button>
             </div>
-          )}
-          
-          {editedChore.completed && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2">
-              <span className="text-green-600 text-lg">✅</span>
-              <span className="text-green-700 text-sm font-medium">Completed</span>
-            </div>
-          )}
-        </div>
-
+          </div>
+        }
+      >
         <div className="space-y-4">
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Title</label>
+          <div className="space-y-3">
+            {choreIsOverdue && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <AlertTriangle size={18} className="text-red-500" />
+                This chore is overdue!
+              </div>
+            )}
+
+            {editedChore.completed && (
+              <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                <span className="text-lg">✅</span>
+                Completed
+              </div>
+            )}
+          </div>
+
+          <FormField label="Title" htmlFor="choreTitle" required>
             <input
+              id="choreTitle"
               type="text"
               value={editedChore.title}
               onChange={(e) => setEditedChore(prev => ({ ...prev, title: e.target.value }))}
-              className="w-full p-3 border border-slate-200 rounded-xl focus:border-teal-400 focus:outline-none bg-slate-50"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
               placeholder="Chore title..."
             />
+          </FormField>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Assigned To" htmlFor="choreAssigned">
+              <div className="flex items-center gap-2">
+                <User size={16} className="text-slate-500" />
+                <select
+                  id="choreAssigned"
+                  value={assignedMemberName}
+                  onChange={(e) => setEditedChore(prev => ({ ...prev, assignedTo: [e.target.value] }))}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+                >
+                  {familyMembers.map(member => (
+                    <option key={member.id} value={member.name}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </FormField>
+
+            <FormField label="Due Date" htmlFor="choreDueDate">
+              <div className="flex items-center gap-2">
+                <Calendar size={16} className="text-slate-500" />
+                <input
+                  id="choreDueDate"
+                  type="date"
+                  value={editedChore.dueDate}
+                  onChange={(e) => setEditedChore(prev => ({ ...prev, dueDate: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+                />
+              </div>
+            </FormField>
           </div>
 
-          {/* Assigned To & Due Date */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                <User size={16} />
-                Assigned To
-              </label>
-              <select
-                value={assignedMemberName}
-                onChange={(e) => setEditedChore(prev => ({ ...prev, assignedTo: [e.target.value] }))}
-                className="w-full p-3 border border-slate-200 rounded-xl focus:border-teal-400 focus:outline-none bg-slate-50"
-              >
-                {familyMembers.map(member => (
-                  <option key={member.id} value={member.name}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                <Calendar size={16} />
-                Due Date
-              </label>
+          <FormField label="Points" htmlFor="chorePoints" required>
+            <div className="flex items-center gap-2">
+              <Star size={16} className="text-yellow-500" />
               <input
-                type="date"
-                value={editedChore.dueDate}
-                onChange={(e) => setEditedChore(prev => ({ ...prev, dueDate: e.target.value }))}
-                className="w-full p-3 border border-slate-200 rounded-xl focus:border-teal-400 focus:outline-none bg-slate-50"
+                id="chorePoints"
+                type="number"
+                min={1}
+                max={100}
+                value={editedChore.points}
+                onChange={(e) => setEditedChore(prev => ({ ...prev, points: parseInt(e.target.value, 10) || 0 }))}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
               />
             </div>
-          </div>
-
-          {/* Points */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-              <Star size={16} />
-              Points
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="100"
-              value={editedChore.points}
-              onChange={(e) => setEditedChore(prev => ({ ...prev, points: parseInt(e.target.value) || 0 }))}
-              className="w-full p-3 border border-slate-200 rounded-xl focus:border-teal-400 focus:outline-none bg-slate-50"
-            />
-          </div>
+          </FormField>
         </div>
+      </Modal>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 mt-8">
-          <button
-            onClick={handleSave}
-            className="flex-1 bg-teal-500 text-white py-3 px-4 rounded-xl hover:bg-teal-600 transition-colors font-medium"
-          >
-            Save Changes
-          </button>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="bg-red-100 text-red-600 py-3 px-4 rounded-xl hover:bg-red-200 transition-colors font-medium flex items-center gap-2"
-          >
-            <Trash2 size={16} />
-            Delete
-          </button>
-          <button
-            onClick={onClose}
-            className="bg-slate-200 text-slate-600 py-3 px-4 rounded-xl hover:bg-slate-300 transition-colors font-medium"
-          >
-            Cancel
-          </button>
-        </div>
-
-        {/* Delete Confirmation */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60">
-            <div className="bg-white rounded-2xl p-6 mx-4 max-w-sm w-full">
-              <h4 className="text-lg font-semibold text-slate-800 mb-3">Delete Chore</h4>
-              <p className="text-slate-600 mb-6">Are you sure you want to delete "{editedChore.title}"? This action cannot be undone.</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleDelete}
-                  className="flex-1 bg-red-500 text-white py-2 px-4 rounded-xl hover:bg-red-600 transition-colors font-medium"
-                >
-                  Delete
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 bg-slate-200 text-slate-600 py-2 px-4 rounded-xl hover:bg-slate-300 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Delete Chore"
+        size="sm"
+        dismissible={false}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleDelete} className="bg-red-500 hover:bg-red-600 focus-visible:ring-red-500">
+              Delete
+            </Button>
           </div>
-        )}
-      </div>
-    </div>
+        }
+      >
+        <p className="text-sm text-slate-600">
+          Are you sure you want to delete "{editedChore.title}"? This action cannot be undone.
+        </p>
+      </Modal>
+    </>
   );
 };
 

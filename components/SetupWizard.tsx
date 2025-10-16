@@ -3,59 +3,13 @@ import { supabaseService } from '../supabaseService';
 import { AuthComponent } from './AuthComponent';
 import QRScannerModal from './QRScannerModal';
 import { authService } from '../services/authService';
+import { useAddressAutocomplete } from '../hooks/useAddressAutocomplete';
+import { formatNominatimAddress, AddressSuggestion } from '../utils/addressUtils';
+import { authLogger } from '../utils/logger';
 
 interface SetupWizardProps {
   onComplete: (familyId: string) => void;
 }
-
-// Address autocomplete dependencies from FamilyTab
-interface NominatimAddressDetails {
-  house_number?: string;
-  road?: string;
-  suburb?: string;
-  city?: string;
-  town?: string;
-  village?: string;
-  hamlet?: string;
-  county?: string;
-  state?: string;
-  postcode?: string;
-  country?: string;
-  country_code?: string;
-  city_district?: string;
-}
-interface ParsedNominatimSuggestion {
-  place_id: number;
-  display_name: string;
-  address: NominatimAddressDetails;
-}
-const formatNominatimAddress = (
-  addressDetails: NominatimAddressDetails,
-  userInputForStreetNumber: string
-): string => {
-  if (!addressDetails) return '';
-  let streetPart = '';
-  let townSuburbPart = '';
-  let statePart = '';
-  let postcodePart = '';
-  let countryPart = '';
-  let streetNumber = addressDetails.house_number || '';
-  if (!streetNumber && userInputForStreetNumber) {
-    const inputMatch = userInputForStreetNumber.match(/^\d+[a-zA-Z]?/);
-    if (inputMatch) streetNumber = inputMatch[0];
-  }
-  const roadName = addressDetails.road || '';
-  if (streetNumber && roadName) streetPart = `${streetNumber} ${roadName}`;
-  else if (roadName) streetPart = roadName;
-  else if (streetNumber) streetPart = streetNumber;
-  streetPart = streetPart.trim();
-  townSuburbPart = addressDetails.suburb || addressDetails.town || addressDetails.village || addressDetails.hamlet || addressDetails.city || addressDetails.county || '';
-  statePart = addressDetails.state || '';
-  postcodePart = addressDetails.postcode || '';
-  countryPart = addressDetails.country || '';
-  const formattedAddressParts = [streetPart, townSuburbPart, statePart, postcodePart, countryPart].filter(part => part && part.trim() !== '');
-  return formattedAddressParts.join(', ');
-};
 
 const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const [step, setStep] = useState(0); // Start with step 0 for authentication
@@ -69,58 +23,34 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const [familyPhoto, setFamilyPhoto] = useState<string | null>(null);
 
   // Address autocomplete state
-  const [addressSuggestions, setAddressSuggestions] = useState<ParsedNominatimSuggestion[]>([]);
-  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [currentAddressInput, setCurrentAddressInput] = useState('');
-  const debounceTimeoutRef = React.useRef<number | null>(null);
-  const suggestionsContainerRef = React.useRef<HTMLDivElement>(null);
-  const addressInputRef = React.useRef<HTMLInputElement>(null);
+  const {
+    suggestions: addressSuggestions,
+    isLoading: isSuggestionsLoading,
+    showSuggestions,
+    currentAddressInput,
+    suggestionsContainerRef,
+    addressInputRef,
+    handleAddressInputChange: autocompleteHandleInputChange,
+    handleSuggestionClick: autocompleteHandleSuggestionClick,
+    setShowSuggestions,
+    setCurrentAddressInput: setAutocompleteAddress
+  } = useAddressAutocomplete(address || '');
 
   React.useEffect(() => {
-    setCurrentAddressInput(address);
-  }, [address]);
-
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (suggestionsContainerRef.current && !suggestionsContainerRef.current.contains(event.target as Node) && addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const fetchAddressSuggestions = React.useCallback(async (query: string) => {
-    if (query.length < 3) { setAddressSuggestions([]); setShowSuggestions(false); return; }
-    setIsSuggestionsLoading(true);
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`);
-      if (!response.ok) throw new Error('Network response was not ok');
-      const data: ParsedNominatimSuggestion[] = await response.json();
-      const validSuggestions = data.filter(s => s.address);
-      setAddressSuggestions(validSuggestions); setShowSuggestions(true);
-    } catch (error) { console.error('Failed to fetch address suggestions:', error); setAddressSuggestions([]); } 
-    finally { setIsSuggestionsLoading(false); }
-  }, []);
+    setAutocompleteAddress(address || '');
+  }, [address, setAutocompleteAddress]);
 
   const handleAddressInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newAddress = event.target.value;
-    setCurrentAddressInput(newAddress);
-    setAddress(newAddress);
-    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-    if (newAddress.trim() === '') { 
-      setAddressSuggestions([]); 
-      setShowSuggestions(false); 
-      return; 
-    }
-    debounceTimeoutRef.current = window.setTimeout(() => fetchAddressSuggestions(newAddress), 750);
+    setAddress(event.target.value);
+    autocompleteHandleInputChange(event);
   };
 
-  const handleSuggestionClick = (suggestion: ParsedNominatimSuggestion) => {
-    const finalAddress = formatNominatimAddress(suggestion.address, currentAddressInput);
+  const handleSuggestionClick = (suggestion: AddressSuggestion) => {
+    const finalAddress = autocompleteHandleSuggestionClick(
+      suggestion,
+      (selected, userInput) => formatNominatimAddress(selected.address, userInput)
+    );
     setAddress(finalAddress);
-    setCurrentAddressInput(finalAddress); setAddressSuggestions([]); setShowSuggestions(false);
   };
 
   const handleJoinFamily = async () => {
@@ -128,7 +58,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   };
 
   const handleJoinFamilySuccess = async (familyData: any) => {
-    console.log('🎉 Joining family:', familyData);
+    authLogger.info('Joining family', { inviteCode: familyData.inviteCode });
     setError(null);
     setIsLoading(true);
 
@@ -158,16 +88,16 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       const joinedFamilyId = joinResult?.id || familyData?.familyId;
 
       if (!joinedFamilyId) {
-        console.error('❌ Error joining family: No family ID returned or found in response.', joinResult, familyData);
+        authLogger.error('Error joining family: No family ID returned', new Error('No family ID in response'), { joinResult, familyData });
         throw new Error('Failed to obtain family ID after joining.');
       }
 
-      console.log('✅ Successfully joined family, completing setup with family ID:', joinedFamilyId);
+      authLogger.info('Successfully joined family', { familyId: joinedFamilyId });
       dataService.setCurrentFamilyId(joinedFamilyId);
       await dataService.initialize();
       onComplete(joinedFamilyId);
     } catch (error: any) {
-      console.error('❌ Error joining family:', error);
+      authLogger.error('Error joining family', error as Error);
       setError(error.message || 'Failed to join family. Please check the invite code and try again.');
     } finally {
       setIsLoading(false);
@@ -175,15 +105,15 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   };
 
   const handleAuthSuccess = async () => {
-    console.log('✅ Authentication reported by AuthComponent. Re-checking setup status in SetupWizard...');
+    authLogger.info('Authentication completed - rechecking setup status');
     setIsAuthenticated(true); // Mark as authenticated locally within wizard
 
     try {
       const isNowSetupComplete = await authService.isSetupComplete();
-      console.log('[SetupWizard] Post-auth isSetupComplete check result:', isNowSetupComplete);
+      authLogger.debug('Post-auth setup check result', { isSetupComplete: isNowSetupComplete });
 
       if (isNowSetupComplete) {
-        console.log('[SetupWizard] Setup is now complete. Attempting to fetch family ID and bypass wizard steps.');
+        authLogger.info('Setup complete - fetching family ID to bypass wizard');
         const { supabaseService } = await import('../supabaseService');
         const userResult = await supabaseService.getCurrentUser();
 
@@ -192,27 +122,27 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
           if (familiesResult.success && familiesResult.families && familiesResult.families.length > 0) {
             const primaryFamilyId = familiesResult.families[0].family?.id;
             if (primaryFamilyId) {
-              console.log('[SetupWizard] Found primary family ID:', primaryFamilyId, 'Calling onComplete.');
+              authLogger.info('Found primary family - completing setup', { familyId: primaryFamilyId });
               const { dataService } = await import('../dataService');
               dataService.setCurrentFamilyId(primaryFamilyId);
               await dataService.initialize(); // Initialize with the correct family ID
               onComplete(primaryFamilyId); // Bypass wizard steps
               return; // Exit early
             } else {
-              console.warn('[SetupWizard] Setup complete, but no primary family ID found after login. Proceeding to step 1.');
+              authLogger.warn('Setup complete but no primary family ID found - proceeding to step 1');
             }
           } else {
-            console.warn('[SetupWizard] Setup complete, but no families found for user after login. Proceeding to step 1.');
+            authLogger.warn('Setup complete but no families found - proceeding to step 1');
           }
         } else {
-          console.warn('[SetupWizard] Setup complete, but could not get current user after login. Proceeding to step 1.');
+          authLogger.warn('Setup complete but could not get current user - proceeding to step 1');
         }
       }
       // If not setup complete, or if any of the above checks failed to get familyId, proceed to wizard step 1
-      console.log('[SetupWizard] Setup not yet complete or family ID fetch failed. Proceeding to wizard step 1.');
+      authLogger.debug('Setup not complete or family fetch failed - proceeding to step 1');
       setStep(1); // Move to welcome/create/join family step
     } catch (error) {
-      console.error('[SetupWizard] Error in handleAuthSuccess during setup check/family ID fetch:', error);
+      authLogger.error('Error in auth success handler during setup check', error as Error);
       setError('An error occurred while checking your setup. Please try again.');
       setStep(1); // Fallback to step 1 on error
     }
@@ -239,13 +169,13 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log('🚀 Starting family creation process...');
+      authLogger.info('Starting family creation process', { familyName });
       const result = await supabaseService.createFamily(familyName.trim(), address.trim() || undefined);
       if (!result.success) {
         throw new Error(result.error || 'Family creation failed');
       }
       const familyContext = result.family;
-      console.log('✅ Family created successfully:', familyContext);
+      authLogger.info('Family created successfully', { familyId: familyContext.id, familyName: familyContext.name });
       // Add a short delay to ensure DB commit
       await new Promise(res => setTimeout(res, 300));
       // Save family photo if set
@@ -254,14 +184,14 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
           const { dataService } = await import('../dataService');
           await dataService.setCurrentFamilyId(familyContext.id);
           await dataService.saveFamilyPhoto(familyPhoto);
-          console.log('📸 Family photo saved successfully');
+          authLogger.debug('Family photo saved successfully');
         } catch (photoError) {
-          console.error('❌ Error saving family photo:', photoError);
+          authLogger.error('Error saving family photo', photoError as Error);
         }
       }
       onComplete(familyContext.id); // Pass new family ID up
     } catch (err: any) {
-      console.error('❌ Error during setup:', err);
+      authLogger.error('Error during family setup', err as Error);
       setError(err.message || 'An error occurred during setup');
     } finally {
       setIsLoading(false);
@@ -345,13 +275,19 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                     type="text"
                     value={currentAddressInput}
                     onChange={handleAddressInputChange}
-                    onFocus={() => {if (currentAddressInput.length > 2) setShowSuggestions(true);}}
+                    onFocus={() => { if (currentAddressInput.length > 2) setShowSuggestions(true); }}
                     className="shadow appearance-none border rounded w-full py-2 px-3 text-slate-700 leading-tight focus:outline-none focus:shadow-outline"
                     placeholder="e.g., 123 Main St, Springfield"
                     autoComplete="off"
                   />
-                  {showSuggestions && addressSuggestions.length > 0 && (
+                  {(showSuggestions || isSuggestionsLoading) && (
                     <div ref={suggestionsContainerRef} className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {isSuggestionsLoading && (
+                        <div className="flex items-center gap-2 p-2 text-sm text-slate-500">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-teal-500" />
+                          Searching addresses…
+                        </div>
+                      )}
                       {addressSuggestions.map((suggestion) => (
                         <div
                           key={suggestion.place_id}

@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
+import { syncLogger } from '../utils/logger';
 import { useRealtime } from '../components/RealtimeProvider';
 
 interface UseRealtimeDataOptions {
@@ -17,7 +18,7 @@ export const useRealtimeData = (options: UseRealtimeDataOptions) => {
     const { table: eventTable, eventType, record } = event.detail;
     
     if (eventTable === table) {
-      console.log(`🔄 [${table}] Real-time update:`, eventType, record);
+      syncLogger.debug(`🔄 [${table}] Real-time update:`, eventType, record);
       setLastUpdate(new Date());
       
       if (onUpdate) {

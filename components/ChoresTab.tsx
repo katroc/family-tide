@@ -39,7 +39,7 @@ const ChoresTab: React.FC<ChoresTabProps> = ({
 }) => {
   // Real-time chores monitoring
   const { isConnected: isRealtimeConnected } = useRealtimeChores((eventType, record) => {
-    console.log(`✅ [ChoresTab] Real-time chore update: ${eventType}`, record);
+    uiLogger.debug('Real-time chore update', { eventType, recordId: record?.id });
   });
 
   const todayDate = getTodayDateString();

@@ -1,6 +1,8 @@
 // Performance Cache Service
 // Implements intelligent caching for frequently accessed data
 
+import { dataLogger } from '../utils/logger';
+
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -60,7 +62,7 @@ export class PerformanceCache {
       if (oldestKey) {
         this.cache.delete(oldestKey);
         this.stats.evictions++;
-        console.log(`🗑️ [Cache] Evicted oldest entry: ${oldestKey}`);
+        dataLogger.debug('Cache evicted oldest entry', { key: oldestKey });
       }
     }
   }
@@ -78,12 +80,12 @@ export class PerformanceCache {
     if (!this.isValid(entry)) {
       this.cache.delete(key);
       this.stats.misses++;
-      console.log(`⏰ [Cache] Expired entry removed: ${key}`);
+      dataLogger.debug('Cache entry expired', { key });
       return null;
     }
     
     this.stats.hits++;
-    console.log(`✅ [Cache] Hit: ${key}`);
+    dataLogger.debug('Cache hit', { key });
     return entry.data;
   }
 
@@ -101,7 +103,7 @@ export class PerformanceCache {
     });
     
     this.stats.sets++;
-    console.log(`💾 [Cache] Set: ${key} (TTL: ${ttl / 1000}s)`);
+    dataLogger.debug('Cache set', { key, ttlSeconds: ttl / 1000 });
   }
 
   // Invalidate specific cache entries
@@ -111,7 +113,7 @@ export class PerformanceCache {
     for (const key of this.cache.keys()) {
       if (key.startsWith(pattern)) {
         this.cache.delete(key);
-        console.log(`🚫 [Cache] Invalidated: ${key}`);
+        dataLogger.debug('Cache invalidated', { key });
       }
     }
   }
@@ -125,7 +127,7 @@ export class PerformanceCache {
   clear(): void {
     this.cache.clear();
     this.stats = { hits: 0, misses: 0, sets: 0, evictions: 0 };
-    console.log('🧹 [Cache] Cleared all entries');
+    dataLogger.info('Cache cleared');
   }
 
   // Get cache statistics
@@ -153,7 +155,7 @@ export class PerformanceCache {
 
   // Preload commonly accessed data
   async preload(familyId: string, dataService: any): Promise<void> {
-    console.log(`🚀 [Cache] Preloading data for family ${familyId}`);
+    dataLogger.info('Preloading cache data', { familyId });
     
     try {
       // Preload family details (rarely changes)
@@ -168,9 +170,9 @@ export class PerformanceCache {
       const choreTypes = await dataService.getChoreTypes();
       this.set(familyId, 'chore_types', choreTypes);
       
-      console.log(`✅ [Cache] Preloaded core data for family ${familyId}`);
+      dataLogger.info('Cache preload complete', { familyId });
     } catch (error) {
-      console.error('❌ [Cache] Error preloading data:', error);
+      dataLogger.error('Error preloading cache data', error as Error);
     }
   }
 }

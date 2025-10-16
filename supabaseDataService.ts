@@ -2,6 +2,7 @@
 // Implements IDataService interface for Supabase backend
 
 import { supabaseService, supabase } from './supabaseService';
+import { dataLogger } from './utils/logger';
 import {
   FamilyMember,
   NewFamilyMember,
@@ -23,40 +24,40 @@ export class SupabaseDataService {
 
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.log('SupabaseDataService already initialized.');
+      dataLogger.debug('SupabaseDataService already initialized');
       return;
     }
 
-    console.log('🔧 Initializing SupabaseDataService...');
+    dataLogger.info('Initializing SupabaseDataService');
     try {
       const userResult = await supabaseService.getCurrentUser();
       if (!userResult || !userResult.user) {
         // User might be new or auth state not yet fully propagated.
         // Proceed with initialization but without family context yet.
-        console.warn('⚠️ User not authenticated during initial SupabaseDataService.initialize(). This might be normal for new user setup.');
+        dataLogger.warn('User not authenticated during SupabaseDataService init - may be normal for new user setup');
         this.currentFamilyId = null;
       } else {
         // User is authenticated, try to get families.
         const familiesResult = await supabaseService.getUserFamilies();
         if (familiesResult.success && familiesResult.families && familiesResult.families.length > 0) {
           this.currentFamilyId = familiesResult.families[0].family.id;
-          console.log('👨‍👩‍👧‍👦 Set current family:', familiesResult.families[0].family.name);
+          dataLogger.info('Set current family', { familyName: familiesResult.families[0].family.name });
         } else {
           // User has no families yet, or failed to fetch them.
           // This is okay during initial setup.
-          console.warn('⚠️ User has no families or failed to fetch them during initialize. Family creation may be required.');
+          dataLogger.warn('User has no families during init - family creation may be required');
           this.currentFamilyId = null;
         }
       }
-      
+
       this.isInitialized = true;
-      console.log('✅ SupabaseDataService initialized');
+      dataLogger.info('SupabaseDataService initialized successfully');
 
     } catch (error) {
       // Log error but still mark as initialized to allow app to proceed,
       // especially during setup flows where family/user might not exist yet.
-      console.error('❌ Error during SupabaseDataService initialization, but proceeding:', error);
-      this.isInitialized = true; 
+      dataLogger.error('Error during SupabaseDataService initialization - proceeding anyway', error as Error);
+      this.isInitialized = true;
       this.currentFamilyId = null;
     }
   }
@@ -120,7 +121,7 @@ export class SupabaseDataService {
         updatedAt: new Date().toISOString()
       };
     } catch (error) {
-      console.error('Error getting family details:', error);
+      dataLogger.error('Error getting family details', error as Error);
       throw error;
     }
   }
@@ -138,9 +139,9 @@ export class SupabaseDataService {
         })
         .eq('id', familyId);
       if (error) throw error;
-      console.log('✅ Family details saved to Supabase');
+      dataLogger.debug('Family details saved', { familyId });
     } catch (error) {
-      console.error('Error saving family details:', error);
+      dataLogger.error('Error saving family details', error as Error);
       throw error;
     }
   }
@@ -156,7 +157,7 @@ export class SupabaseDataService {
       if (error) throw error;
       return data && data.photo_url ? data.photo_url : null;
     } catch (error) {
-      console.error('Error getting family photo:', error);
+      dataLogger.error('Error getting family photo', error as Error);
       return null;
     }
   }
@@ -172,9 +173,9 @@ export class SupabaseDataService {
         })
         .eq('id', familyId);
       if (error) throw error;
-      console.log('✅ Family photo saved to Supabase');
+      dataLogger.debug('Family photo saved', { familyId });
     } catch (error) {
-      console.error('Error saving family photo:', error);
+      dataLogger.error('Error saving family photo', error as Error);
       throw error;
     }
   }
@@ -200,7 +201,7 @@ export class SupabaseDataService {
         created_at: row.created_at
       }));
     } catch (error) {
-      console.error('Error getting family members:', error);
+      dataLogger.error('Error getting family members', error as Error);
       return [];
     }
   }
@@ -233,7 +234,7 @@ export class SupabaseDataService {
         points: data.points || 0
       };
     } catch (error) {
-      console.error('Error adding family member:', error);
+      dataLogger.error('Error adding family member', error as Error, { name: member.name });
       throw error;
     }
   }
@@ -253,24 +254,24 @@ export class SupabaseDataService {
         })
         .eq('id', member.id);
       if (error) throw error;
-      console.log('✅ Family member updated in Supabase');
+      dataLogger.debug('Family member updated', { memberId: member.id });
     } catch (error) {
-      console.error('Error updating family member:', error);
+      dataLogger.error('Error updating family member', error as Error, { memberId: member.id });
       throw error;
     }
   }
 
   async deleteFamilyMember(id: number): Promise<void> {
     try {
-      console.log('[deleteFamilyMember] Deleting family member with ID:', id);
+      dataLogger.debug('Deleting family member', { memberId: id });
       const { error } = await supabase
         .from('family_members')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      console.log('[deleteFamilyMember] Successfully deleted family member');
+      dataLogger.debug('Successfully deleted family member', { memberId: id });
     } catch (error) {
-      console.error('Error deleting family member:', error);
+      dataLogger.error('Error deleting family member', error as Error, { memberId: id });
       throw error;
     }
   }
@@ -309,7 +310,7 @@ export class SupabaseDataService {
         };
       });
     } catch (error) {
-      console.error('Error getting chores:', error);
+      dataLogger.error('Error getting chores', error as Error);
       return [];
     }
   }
@@ -317,7 +318,7 @@ export class SupabaseDataService {
   async addChore(chore: NewChore): Promise<Chore> {
     const familyId = this.ensureFamilyContext();
     try {
-      console.log('[addChore] Adding new chore:', chore);
+      dataLogger.debug('Adding new chore', { title: chore.title });
       
       // Convert assigned member name to ID if provided
       let assignedToId = null;
@@ -345,8 +346,9 @@ export class SupabaseDataService {
         .select()
         .single();
       if (error) throw error;
-      
-      console.log('[addChore] Successfully added chore:', data);
+
+
+      dataLogger.debug('Successfully added chore', { choreId: String(data.id), title: data.title });
       return {
         id: String(data.id),
         title: data.title,
@@ -358,14 +360,14 @@ export class SupabaseDataService {
         choreTypeId: data.chore_type_id ? String(data.chore_type_id) : null
       };
     } catch (error) {
-      console.error('Error adding chore:', error);
+      dataLogger.error('Error adding chore', error as Error);
       throw error;
     }
   }
 
   async updateChore(chore: Chore): Promise<void> {
     try {
-      console.log('[updateChore] Updating chore:', chore);
+      dataLogger.debug('Updating chore', { choreId: chore.id, title: chore.title });
       
       // Convert assigned member name to ID if provided
       let assignedToId = null;
@@ -389,24 +391,24 @@ export class SupabaseDataService {
         })
         .eq('id', chore.id);
       if (error) throw error;
-      console.log('[updateChore] Successfully updated chore');
+      dataLogger.debug('Successfully updated chore', { choreId: chore.id });
     } catch (error) {
-      console.error('Error updating chore:', error);
+      dataLogger.error('Error updating chore', error as Error, { choreId: chore.id });
       throw error;
     }
   }
 
   async deleteChore(id: number): Promise<void> {
     try {
-      console.log('[deleteChore] Deleting chore with ID:', id);
+      dataLogger.debug('Deleting chore', { choreId: id });
       const { error } = await supabase
         .from('chores')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      console.log('[deleteChore] Successfully deleted chore');
+      dataLogger.debug('Successfully deleted chore', { choreId: id });
     } catch (error) {
-      console.error('Error deleting chore:', error);
+      dataLogger.error('Error deleting chore', error as Error, { choreId: id });
       throw error;
     }
   }
@@ -424,7 +426,7 @@ export class SupabaseDataService {
         icon: row.icon
       }));
     } catch (error) {
-      console.error('Error getting chore types:', error);
+      dataLogger.error('Error getting chore types', error as Error);
       return [];
     }
   }
@@ -432,7 +434,7 @@ export class SupabaseDataService {
   async updateChoreTypes(choreTypes: ChoreType[]): Promise<ChoreType[]> {
     const familyId = this.ensureFamilyContext();
     try {
-      console.log('[updateChoreTypes] Updating chore types:', choreTypes);
+      dataLogger.debug('Updating chore types', { count: choreTypes.length });
       
       // For simplicity, we'll delete existing and insert new ones (like SQLite version)
       // In production, you might want a more sophisticated merge strategy
@@ -461,14 +463,14 @@ export class SupabaseDataService {
       // Return the updated list
       return this.getChoreTypes();
     } catch (error) {
-      console.error('Error updating chore types:', error);
+      dataLogger.error('Error updating chore types', error as Error);
       throw error;
     }
   }
 
   async getEvents(): Promise<EventItem[]> {
     const familyId = this.ensureFamilyContext();
-    console.log('[getEvents] Using familyId:', familyId);
+    dataLogger.debug('Getting events for family', { familyId });
     try {
       const { data, error } = await supabase
         .from('events')
@@ -476,7 +478,7 @@ export class SupabaseDataService {
         .eq('family_id', familyId)
         .order('date');
       if (error) throw error;
-      console.log('[getEvents] Raw data from Supabase:', data);
+      dataLogger.debug('Raw events data from Supabase', { count: data?.length || 0 });
       
       // Get family members to convert IDs back to names
       const familyMembers = await this.getFamilyMembers();
@@ -500,7 +502,7 @@ export class SupabaseDataService {
         };
       });
     } catch (error) {
-      console.error('Error getting events:', error);
+      dataLogger.error('Error getting events', error as Error);
       return [];
     }
   }
@@ -508,7 +510,7 @@ export class SupabaseDataService {
   async addEvent(event: Omit<EventItem, 'id'>): Promise<EventItem> {
     const familyId = this.ensureFamilyContext();
     try {
-      console.log('[addEvent] Received event data:', event);
+      dataLogger.debug('Adding event', { title: event.title, date: event.date });
       
       // Convert member names to UUIDs if needed
       let attendeeIds: string[] = [];
@@ -521,7 +523,7 @@ export class SupabaseDataService {
             return member ? member.id : null;
           })
           .filter(id => id !== null) as string[];
-        console.log('[addEvent] Converted attendees to IDs:', { names: event.attendees, ids: attendeeIds });
+        dataLogger.debug('Converted attendees to IDs', { count: attendeeIds.length });
       }
 
       const { data, error } = await supabase
@@ -550,14 +552,14 @@ export class SupabaseDataService {
         attendees: event.attendees || []
       };
     } catch (error) {
-      console.error('Error adding event:', error);
+      dataLogger.error('Error adding event', error as Error);
       throw error;
     }
   }
 
   async updateEvent(event: EventItem): Promise<void> {
     try {
-      console.log('[updateEvent] Updating event:', event);
+      dataLogger.debug('Updating event', { eventId: event.id, title: event.title });
       
       // Convert member names to UUIDs if needed
       let attendeeIds: string[] = [];
@@ -583,24 +585,24 @@ export class SupabaseDataService {
         })
         .eq('id', event.id);
       if (error) throw error;
-      console.log('[updateEvent] Successfully updated event');
+      dataLogger.debug('Successfully updated event');
     } catch (error) {
-      console.error('Error updating event:', error);
+      dataLogger.error('Error updating event', error as Error);
       throw error;
     }
   }
 
   async deleteEvent(id: number): Promise<void> {
     try {
-      console.log('[deleteEvent] Deleting event with ID:', id);
+      dataLogger.debug('Deleting event', { eventId: id });
       const { error } = await supabase
         .from('events')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      console.log('[deleteEvent] Successfully deleted event');
+      dataLogger.debug('Successfully deleted event');
     } catch (error) {
-      console.error('Error deleting event:', error);
+      dataLogger.error('Error deleting event', error as Error);
       throw error;
     }
   }
@@ -621,7 +623,7 @@ export class SupabaseDataService {
         available: !!row.available
       }));
     } catch (error) {
-      console.error('Error getting rewards:', error);
+      dataLogger.error('Error getting rewards', error as Error);
       return [];
     }
   }
@@ -629,7 +631,7 @@ export class SupabaseDataService {
   async addReward(reward: NewReward): Promise<Reward> {
     const familyId = this.ensureFamilyContext();
     try {
-      console.log('[addReward] Adding new reward:', reward);
+      dataLogger.debug('Adding reward', { title: reward.title, cost: reward.cost });
       const { data, error } = await supabase
         .from('rewards')
         .insert([
@@ -646,7 +648,7 @@ export class SupabaseDataService {
         .single();
       if (error) throw error;
       
-      console.log('[addReward] Successfully added reward:', data);
+      dataLogger.debug('Successfully added reward', { rewardId: String(data.id) });
       return {
         id: String(data.id),
         title: data.title,
@@ -655,14 +657,14 @@ export class SupabaseDataService {
         available: data.available
       };
     } catch (error) {
-      console.error('Error adding reward:', error);
+      dataLogger.error('Error adding reward', error as Error);
       throw error;
     }
   }
 
   async updateReward(reward: Reward): Promise<void> {
     try {
-      console.log('[updateReward] Updating reward:', reward);
+      dataLogger.debug('Updating reward', { rewardId: reward.id });
       const { error } = await supabase
         .from('rewards')
         .update({
@@ -673,24 +675,24 @@ export class SupabaseDataService {
         })
         .eq('id', reward.id);
       if (error) throw error;
-      console.log('[updateReward] Successfully updated reward');
+      dataLogger.debug('Successfully updated reward');
     } catch (error) {
-      console.error('Error updating reward:', error);
+      dataLogger.error('Error updating reward', error as Error);
       throw error;
     }
   }
 
   async deleteReward(id: number): Promise<void> {
     try {
-      console.log('[deleteReward] Deleting reward with ID:', id);
+      dataLogger.debug('Deleting reward', { rewardId: id });
       const { error } = await supabase
         .from('rewards')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      console.log('[deleteReward] Successfully deleted reward');
+      dataLogger.debug('Successfully deleted reward');
     } catch (error) {
-      console.error('Error deleting reward:', error);
+      dataLogger.error('Error deleting reward', error as Error);
       throw error;
     }
   }
@@ -728,7 +730,7 @@ export class SupabaseDataService {
         };
       });
     } catch (error) {
-      console.error('Error getting routines:', error);
+      dataLogger.error('Error getting routines', error as Error);
       return [];
     }
   }
@@ -736,7 +738,7 @@ export class SupabaseDataService {
   async addRoutine(routine: Omit<Routine, 'id'>): Promise<Routine> {
     const familyId = this.ensureFamilyContext();
     try {
-      console.log('[addRoutine] Adding new routine:', routine);
+      dataLogger.debug('Adding routine', { name: routine.name });
       
       // Convert member names to UUIDs if needed
       let memberIds: string[] = [];
@@ -774,7 +776,7 @@ export class SupabaseDataService {
         .single();
       if (error) throw error;
       
-      console.log('[addRoutine] Successfully added routine:', data);
+      dataLogger.debug('Successfully added routine', { routineId: String(data.id) });
       return {
         id: String(data.id),
         name: data.name,
@@ -783,7 +785,7 @@ export class SupabaseDataService {
         completionPoints: data.completion_points
       };
     } catch (error) {
-      console.error('Error adding routine:', error);
+      dataLogger.error('Error adding routine', error as Error);
       throw error;
     }
   }
@@ -791,7 +793,7 @@ export class SupabaseDataService {
   async updateRoutines(routines: Routine[]): Promise<Routine[]> {
     const familyId = this.ensureFamilyContext();
     try {
-      console.log('[updateRoutines] Updating routines:', routines);
+      dataLogger.debug('Updating routines', { count: routines.length });
       
       // Delete existing routines for this family
       const { error: deleteError } = await supabase
@@ -841,21 +843,21 @@ export class SupabaseDataService {
       // Return the updated list
       return this.getRoutines();
     } catch (error) {
-      console.error('Error updating routines:', error);
+      dataLogger.error('Error updating routines', error as Error);
       throw error;
     }
   }
 
   async deleteRoutine(id: string): Promise<void> {
     try {
-      console.log('[deleteRoutine] Deleting routine with ID:', id);
+      dataLogger.debug('Deleting routine', { routineId: id });
       
       // Delete associated progress records first
       const { error: progressError } = await supabase
         .from('daily_routine_progress')
         .delete()
         .eq('routine_id', id);
-      if (progressError) console.warn('Warning deleting routine progress:', progressError);
+      if (progressError) dataLogger.warn('Warning deleting routine progress', { error: progressError });
       
       // Delete the routine
       const { error } = await supabase
@@ -864,9 +866,9 @@ export class SupabaseDataService {
         .eq('id', id);
       if (error) throw error;
       
-      console.log('[deleteRoutine] Successfully deleted routine');
+      dataLogger.debug('Successfully deleted routine');
     } catch (error) {
-      console.error('Error deleting routine:', error);
+      dataLogger.error('Error deleting routine', error as Error);
       throw error;
     }
   }
@@ -899,7 +901,7 @@ export class SupabaseDataService {
         };
       });
     } catch (error) {
-      console.error('Error getting daily routine progress:', error);
+      dataLogger.error('Error getting daily routine progress', error as Error);
       return [];
     }
   }
@@ -907,7 +909,7 @@ export class SupabaseDataService {
   async upsertDailyRoutineProgress(progress: DailyRoutineProgress): Promise<void> {
     this.ensureInitialized(); // Just ensure service is initialized, don't need family context for insert
     try {
-      console.log('[upsertDailyRoutineProgress] Upserting progress:', progress);
+      dataLogger.debug('Upserting daily routine progress', { memberId: progress.memberId, routineId: progress.routineId, date: progress.date });
       
       // Convert member name to ID if needed
       let memberId = progress.memberId;
@@ -939,9 +941,9 @@ export class SupabaseDataService {
         });
       
       if (error) throw error;
-      console.log('[upsertDailyRoutineProgress] Successfully upserted progress');
+      dataLogger.debug('Successfully upserted routine progress');
     } catch (error) {
-      console.error('Error upserting daily routine progress:', error);
+      dataLogger.error('Error upserting daily routine progress', error as Error);
       throw error;
     }
   }
@@ -954,9 +956,9 @@ export class SupabaseDataService {
         .update({ active_tab: tabId })
         .eq('id', familyId);
       if (error) throw error;
-      console.log('✅ Active tab saved to Supabase:', tabId);
+      dataLogger.debug('Active tab saved', { tabId });
     } catch (error) {
-      console.error('Error saving active tab:', error);
+      dataLogger.error('Error saving active tab', error as Error);
       throw error;
     }
   }
@@ -972,7 +974,7 @@ export class SupabaseDataService {
       if (error) throw error;
       return data && data.active_tab ? data.active_tab as TabId : null;
     } catch (error) {
-      console.error('Error getting active tab:', error);
+      dataLogger.error('Error getting active tab', error as Error);
       return null;
     }
   }
@@ -992,12 +994,12 @@ export class SupabaseDataService {
     try {
       const userResult = await supabaseService.getCurrentUser();
       if (!userResult || !userResult.user || !userResult.user.id) {
-        console.error('❌ Cannot create family: User not authenticated with Supabase or user ID is missing.');
+        dataLogger.error('Cannot create family - user not authenticated');
         throw new Error('User not authenticated or user ID missing, cannot create family.');
       }
 
       const user = userResult.user;
-      console.log(`➕ Creating new family "${familyName}" for user ${user.id}`);
+      dataLogger.info('Creating new family', { familyName, userId: user.id });
 
       // Insert new family into 'families' table, linking to the user
       // Adjust columns based on your actual 'families' table schema
@@ -1009,21 +1011,21 @@ export class SupabaseDataService {
       );
 
       if (error) {
-        console.error('❌ Error creating new family in Supabase:', error);
+        dataLogger.error('Error creating new family in Supabase', error);
         throw error;
       }
 
       if (data && data.length > 0) {
         const newFamily = data[0];
         this.currentFamilyId = newFamily.id; // Set context to the new family
-        console.log(`✅ New family created with ID: ${newFamily.id}, Name: ${newFamily.name}`);
+        dataLogger.info('New family created', { familyId: newFamily.id, name: newFamily.name });
         return { id: newFamily.id, name: newFamily.name, address: newFamily.address };
       } else {
-        console.error('❌ Family creation did not return expected data.');
+        dataLogger.error('Family creation did not return expected data');
         return null;
       }
     } catch (error) {
-      console.error('Error in createNewFamily:', error);
+      dataLogger.error('Error in createNewFamily', error as Error);
       throw error; // Re-throw to be caught by caller
     }
   }
@@ -1038,13 +1040,13 @@ export class SupabaseDataService {
         throw new Error('User not authenticated, cannot join family.');
       }
 
-      console.log(`🔍 Looking for family with invite code: ${inviteCode}`);
+      dataLogger.info('Looking for family with invite code', { inviteCode });
 
       // Use the proper RPC function that bypasses RLS issues
       const joinResult = await supabaseService.joinFamilyByInvite(inviteCode, 'child');
       
       if (!joinResult.success) {
-        console.error('❌ Failed to join family:', joinResult.error);
+        dataLogger.error('Failed to join family', undefined, { error: joinResult.error });
         throw new Error(joinResult.error || 'Failed to join family. Please check the invite code and try again.');
       }
 
@@ -1053,7 +1055,7 @@ export class SupabaseDataService {
         throw new Error('Family data not returned after successful join.');
       }
 
-      console.log(`👨‍👩‍👧‍👦 Successfully joined family: ${familyData.name}`);
+      dataLogger.info('Successfully joined family', { familyName: familyData.name });
       
       // Set current family ID for this service instance
       this.currentFamilyId = familyData.id;
@@ -1064,7 +1066,7 @@ export class SupabaseDataService {
         address: familyData.address
       };
     } catch (error) {
-      console.error('Error in joinFamilyWithInviteCode:', error);
+      dataLogger.error('Error in joinFamilyWithInviteCode', error as Error);
       throw error;
     }
   }
@@ -1075,4 +1077,4 @@ export class SupabaseDataService {
   }
 }
 
-console.log('📦 SupabaseDataService loaded');
+dataLogger.info('SupabaseDataService loaded');

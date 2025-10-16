@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseService';
 import { dataService } from '../dataService';
+import { syncLogger } from '../utils/logger';
 
 interface RealtimeContextType {
   isConnected: boolean;
@@ -37,7 +38,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
 
   // Handle real-time events
   const handleRealtimeEvent = useCallback((table: string, payload: any) => {
-    console.log(`📡 [Realtime] ${table} event:`, payload);
+    syncLogger.debug('Realtime event received', { table, eventType: payload.eventType, recordId: payload.new?.id || payload.old?.id });
     
     const { eventType, new: newRecord, old: oldRecord } = payload;
     
@@ -55,15 +56,15 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
   // Subscribe to a specific table
   const subscribeToTable = useCallback((table: string, callback?: () => void) => {
     if (!familyId) {
-      console.log(`⚠️ [Realtime] Skipping subscription to ${table} - no family ID`);
+      syncLogger.warn('Skipping subscription - no family ID', { table });
       return;
     }
     if (activeChannels.has(table)) {
-      console.log(`⚠️ [Realtime] Already subscribed to ${table}, skipping.`);
+      syncLogger.debug('Already subscribed to table', { table });
       return;
     }
 
-    console.log(`🔔 [Realtime] Subscribing to ${table} for family ${familyId}`);
+    syncLogger.info('Subscribing to table', { table, familyId });
 
     const channel = supabase
       .channel(`${table}-changes-${familyId}`)
@@ -81,7 +82,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
         }
       )
       .subscribe((status) => {
-        console.log(`📡 [Realtime] ${table} subscription status:`, status);
+        syncLogger.debug('Subscription status changed', { table, status });
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
           setSubscriptions(prev => [...prev.filter(t => t !== table), table]);
@@ -95,7 +96,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
   const unsubscribeFromTable = useCallback((table: string) => {
     const channel = activeChannels.get(table);
     if (channel) {
-      console.log(`🔕 [Realtime] Unsubscribing from ${table}`);
+      syncLogger.info('Unsubscribing from table', { table });
       supabase.removeChannel(channel);
       setActiveChannels(prev => {
         const newMap = new Map(prev);
@@ -108,7 +109,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
 
   // Unsubscribe from all tables
   const unsubscribeAll = useCallback(() => {
-    console.log('🔕 [Realtime] Unsubscribing from all tables');
+    syncLogger.info('Unsubscribing from all tables');
     activeChannels.forEach((channel, table) => {
       supabase.removeChannel(channel);
     });
@@ -120,7 +121,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
   // Auto-subscribe to core tables when familyId changes
   useEffect(() => {
     if (familyId) {
-      console.log(`🚀 [Realtime] Setting up subscriptions for family ${familyId}`);
+      syncLogger.info('Setting up realtime subscriptions', { familyId });
       const coreTables = ['family_members', 'chores', 'events', 'rewards', 'routines'];
       coreTables.forEach(table => {
         if (!subscriptions.includes(table)) {

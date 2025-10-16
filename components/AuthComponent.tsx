@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authLogger } from '../utils/logger';
 import { supabaseService } from '../supabaseService';
 import { authService } from '../services/authService';
 
@@ -51,7 +52,7 @@ export const AuthComponent: React.FC<AuthComponentProps> = ({ onAuthSuccess }) =
         await onAuthSuccess(isSetupComplete);
       }
     } catch (err: any) {
-      console.error('❌ Authentication error:', err);
+      authLogger.error('❌ Authentication error:', err);
       setError(err.message || 'An error occurred during authentication');
     } finally {
       setIsLoading(false);

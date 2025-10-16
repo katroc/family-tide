@@ -9,6 +9,10 @@ import {
   FC
 } from 'react';
 import { dataService } from '../dataService';
+import { dataLogger } from '../utils/logger';
+import { useFamilyMutations, familyQueryKeys } from './useFamilyQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { fetchFamilyDataSnapshot } from '../services/familyDataLoader';
 import {
   FamilyMember,
   NewFamilyMember,
@@ -57,7 +61,7 @@ export interface UseFamilyDataReturn {
 
   // Chore operations
   handleCompleteChore: (choreId: number) => Promise<void>;
-  handleSaveChore: (newChoreData: Omit<Chore, 'id' | 'completed'>) => Promise<void>;
+  handleSaveChore: (choreData: Chore | NewChore) => Promise<void>;
   handleDeleteChore: (choreId: number) => Promise<void>;
 
   // Routine operations
@@ -74,6 +78,16 @@ export interface UseFamilyDataReturn {
  */
 function useProvideFamilyData(): UseFamilyDataReturn {
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const queryClient = useQueryClient();
+  const {
+    memberMutation,
+    deleteMemberMutation,
+    choreMutation,
+    deleteChoreMutation,
+    familyDetailsMutation,
+    routineProgressMutation,
+    familyPhotoMutation
+  } = useFamilyMutations();
 
   // Data states
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -94,83 +108,28 @@ function useProvideFamilyData(): UseFamilyDataReturn {
   const loadData = useCallback(async (currentDate: string) => {
     try {
       setIsLoading(true);
-      console.log('Starting data service initialization...');
-      await dataService.initialize();
-      console.log('Data service initialized, loading data...');
 
-      const [
-        members,
-        details,
-        choresData,
-        types,
-        routinesData,
-        rewardsData,
-        eventsData,
-        progress,
-        photo
-      ] = await Promise.all([
-        dataService.getFamilyMembers().catch(e => {
-          console.error('Error loading family members:', e);
-          return [];
-        }),
-        dataService.getFamilyDetails().catch(e => {
-          console.error('Error loading family details:', e);
-          return { name: 'My Family', address: '', photoObjectPosition: 'center center' };
-        }),
-        dataService.getChores().catch(e => {
-          console.error('Error loading chores:', e);
-          return [];
-        }),
-        dataService.getChoreTypes().catch(e => {
-          console.error('Error loading chore types:', e);
-          return [];
-        }),
-        dataService.getRoutines().catch(e => {
-          console.error('Error loading routines:', e);
-          return [];
-        }),
-        dataService.getRewards().catch(e => {
-          console.error('Error loading rewards:', e);
-          return [];
-        }),
-        dataService.getEvents().catch(e => {
-          console.error('Error loading events:', e);
-          return [];
-        }),
-        dataService.getDailyRoutineProgress(currentDate).catch(e => {
-          console.error('Error loading routine progress:', e);
-          return [];
-        }),
-        dataService.getFamilyPhoto().catch(e => {
-          console.error('Error loading family photo:', e);
-          return null;
-        })
-      ]);
-
-      console.log('Data loaded successfully:', {
-        members: members.length,
-        chores: choresData.length,
-        routines: routinesData.length,
-        rewards: rewardsData.length,
-        events: eventsData.length,
-        hasPhoto: !!photo
+      const snapshot = await queryClient.fetchQuery({
+        queryKey: familyQueryKeys.snapshot(currentDate),
+        queryFn: () => fetchFamilyDataSnapshot(currentDate),
+        staleTime: 1000 * 60
       });
 
-      setFamilyMembers(members);
-      setFamilyDetails(details);
-      setChores(choresData);
-      setChoreTypes(types);
-      setRoutines(routinesData);
-      setRewards(rewardsData);
-      setEvents(eventsData);
-      setDailyRoutineProgress(progress);
-      setFamilyPhoto(photo);
+      setFamilyMembers(snapshot.members);
+      setFamilyDetails(snapshot.details);
+      setChores(snapshot.chores);
+      setChoreTypes(snapshot.choreTypes);
+      setRoutines(snapshot.routines);
+      setRewards(snapshot.rewards);
+      setEvents(snapshot.events);
+      setDailyRoutineProgress(snapshot.progress);
+      setFamilyPhoto(snapshot.photo);
     } catch (error) {
-      console.error('Error in loadData:', error);
+      dataLogger.error('Error loading family data', error as Error, { currentDate });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   // Helper functions
   const getMemberById = useCallback((id: number): FamilyMember | undefined => {
@@ -184,28 +143,27 @@ function useProvideFamilyData(): UseFamilyDataReturn {
   // Member handlers
   const handleSaveMember = useCallback(async (member: FamilyMember | NewFamilyMember) => {
     try {
+      const result = await memberMutation.mutateAsync(member);
       if ('id' in member) {
-        await dataService.updateFamilyMember(member);
         setFamilyMembers(prev => prev.map(m => m.id === member.id ? member : m));
-      } else {
-        const newMember = await dataService.addFamilyMember(member);
-        setFamilyMembers(prev => [...prev, newMember]);
+      } else if (result) {
+        setFamilyMembers(prev => [...prev, result as FamilyMember]);
       }
     } catch (error) {
-      console.error('Error saving member:', error);
+      dataLogger.error('Error saving family member', error as Error, { memberId: 'id' in member ? member.id : 'new' });
       throw error;
     }
-  }, []);
+  }, [memberMutation, setFamilyMembers]);
 
   const handleDeleteMember = useCallback(async (id: number) => {
     try {
-      await dataService.deleteFamilyMember(id);
+      await deleteMemberMutation.mutateAsync(id);
       setFamilyMembers(prev => prev.filter(m => m.id !== id));
     } catch (error) {
-      console.error('Error deleting member:', error);
+      dataLogger.error('Error deleting family member', error as Error, { memberId: id });
       throw error;
     }
-  }, []);
+  }, [deleteMemberMutation, setFamilyMembers]);
 
   // Chore handlers
   const handleCompleteChore = useCallback(async (choreId: number) => {
@@ -214,7 +172,7 @@ function useProvideFamilyData(): UseFamilyDataReturn {
       if (!chore) return;
 
       const updatedChore = { ...chore, completed: true };
-      await dataService.updateChore(updatedChore);
+      await choreMutation.mutateAsync(updatedChore);
       setChores(prev => prev.map(c => c.id === choreId ? updatedChore : c));
 
       // Update member points if assigned
@@ -225,40 +183,41 @@ function useProvideFamilyData(): UseFamilyDataReturn {
             ...member,
             points: member.points + (chore.points || 0)
           };
-          await dataService.updateFamilyMember(updatedMember);
+          await memberMutation.mutateAsync(updatedMember);
           setFamilyMembers(prev =>
             prev.map(m => m.id === updatedMember.id ? updatedMember : m)
           );
         }
       }
     } catch (error) {
-      console.error('Error completing chore:', error);
+      dataLogger.error('Error completing chore', error as Error, { choreId });
       throw error;
     }
-  }, [chores, getMemberByName]);
+  }, [chores, getMemberByName, choreMutation, memberMutation, setChores, setFamilyMembers]);
 
-  const handleSaveChore = useCallback(async (newChoreData: Omit<Chore, 'id' | 'completed'>) => {
+  const handleSaveChore = useCallback(async (choreData: Chore | NewChore) => {
     try {
-      const newChore = await dataService.addChore({
-        ...newChoreData,
-        completed: false
-      });
-      setChores(prev => [...prev, newChore]);
+      const savedChore = await choreMutation.mutateAsync(choreData);
+      if ('id' in choreData) {
+        setChores(prev => prev.map(c => (c.id === choreData.id ? choreData : c)));
+      } else if (savedChore) {
+        setChores(prev => [...prev, savedChore as Chore]);
+      }
     } catch (error) {
-      console.error('Error saving chore:', error);
+      dataLogger.error('Error saving chore', error as Error);
       throw error;
     }
-  }, []);
+  }, [choreMutation, setChores]);
 
   const handleDeleteChore = useCallback(async (choreId: number) => {
     try {
-      await dataService.deleteChore(choreId);
+      await deleteChoreMutation.mutateAsync(choreId);
       setChores(prev => prev.filter(c => c.id !== choreId));
     } catch (error) {
-      console.error('Error deleting chore:', error);
+      dataLogger.error('Error deleting chore', error as Error, { choreId });
       throw error;
     }
-  }, []);
+  }, [deleteChoreMutation, setChores]);
 
   // Routine handlers
   const handleRoutineStepToggle = useCallback(async (
@@ -289,7 +248,7 @@ function useProvideFamilyData(): UseFamilyDataReturn {
         isFullyCompleted: !!isFullyCompleted
       };
 
-      await dataService.upsertDailyRoutineProgress(updatedProgress);
+      await routineProgressMutation.mutateAsync(updatedProgress);
 
       setDailyRoutineProgress(prev => {
         const existingIndex = prev.findIndex(p =>
@@ -305,7 +264,7 @@ function useProvideFamilyData(): UseFamilyDataReturn {
         }
       });
     } catch (error) {
-      console.error('Error toggling routine step:', error);
+      dataLogger.error('Error toggling routine step', error as Error, { memberId, routineId, stepId, date });
       throw error;
     }
   }, [routines, dailyRoutineProgress]);
@@ -313,27 +272,25 @@ function useProvideFamilyData(): UseFamilyDataReturn {
   // Family handlers
   const handleNewPhotoSelected = useCallback((photoDataUrl: string) => {
     setFamilyPhoto(photoDataUrl);
-    dataService.saveFamilyPhoto(photoDataUrl).catch(console.error);
-  }, []);
+    familyPhotoMutation.mutate(photoDataUrl, {
+      onError: (error) => dataLogger.error('Error saving family photo', error as Error)
+    });
+  }, [familyPhotoMutation]);
 
   const saveFamilyDetails = useCallback(async () => {
     try {
-      console.log('Saving family details:', familyDetails);
-      await dataService.saveFamilyDetails(familyDetails);
-      console.log('Successfully saved family details');
+      dataLogger.debug('Saving family details', { familyName: familyDetails.name, hasAddress: !!familyDetails.address });
+      await familyDetailsMutation.mutateAsync(familyDetails);
+      dataLogger.info('Successfully saved family details', { familyName: familyDetails.name });
     } catch (error: unknown) {
       const errorObj = error as Error & { code?: string };
-      console.error('Error saving family details:', {
-        error: errorObj,
-        errorString: String(errorObj),
-        errorMessage: errorObj.message,
-        errorCode: errorObj.code,
-        errorStack: errorObj.stack,
-        familyDetails
+      dataLogger.error('Error saving family details', errorObj, {
+        familyName: familyDetails.name,
+        errorCode: errorObj.code
       });
       throw new Error(errorObj.message || 'Failed to save family details');
     }
-  }, [familyDetails]);
+  }, [familyDetails, familyDetailsMutation]);
 
   return {
     // State

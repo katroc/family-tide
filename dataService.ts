@@ -16,6 +16,7 @@ import {
 // Import and export SupabaseDataService with performance caching
 import { SupabaseDataService } from './supabaseDataService';
 import { performanceCache, createCachedDataService } from './services/performanceCache';
+import { dataLogger } from './utils/logger';
 
 // Create the base Supabase service
 const baseSupabaseService = new SupabaseDataService();
@@ -38,11 +39,11 @@ class EnhancedDataService {
         this.cachedService = createCachedDataService(baseSupabaseService, familyDetails.id);
         
         // Preload commonly accessed data
-        console.log('🚀 [DataService] Initializing performance cache');
+        dataLogger.info('Initializing performance cache');
         await performanceCache.preload(familyDetails.id, baseSupabaseService);
       }
     } catch (error) {
-      console.warn('⚠️ [DataService] Could not initialize cache - using direct service');
+      dataLogger.warn('Could not initialize cache - using direct service');
       this.cachedService = baseSupabaseService;
     }
   }
@@ -56,7 +57,7 @@ class EnhancedDataService {
   invalidateCache(table: string) {
     if (this.currentFamilyId) {
       performanceCache.invalidate(this.currentFamilyId, table);
-      console.log(`🗑️ [DataService] Cache invalidated for ${table}`);
+      dataLogger.debug('Cache invalidated', { table });
     }
   }
 
@@ -269,4 +270,4 @@ class EnhancedDataService {
 
 export const dataService = new EnhancedDataService();
 
-console.log('🔄 Data service enhanced with intelligent caching and performance optimization');
+dataLogger.info('Data service enhanced with performance caching');

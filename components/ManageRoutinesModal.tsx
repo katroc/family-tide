@@ -2,8 +2,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routine, RoutineStep, FamilyMember } from '../types';
 import { AVAILABLE_ROUTINE_STEP_ICONS, DEFAULT_NEW_ROUTINE_STATE, DEFAULT_NEW_ROUTINE_STEP_STATE } from '../constants';
-import { PlusCircle, Edit3, Trash2, Settings, Save, XCircle, Plus } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Settings, Save, Plus } from 'lucide-react';
 import { getIcon } from '../utils/iconUtils';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import FormField from './ui/FormField';
 
 interface ManageRoutinesModalProps {
   isOpen: boolean;
@@ -127,79 +130,97 @@ const ManageRoutinesModal: React.FC<ManageRoutinesModalProps> = ({
 
   const getMemberNameById = (id: number) => familyMembers.find(m => m.id === id)?.name || 'Unknown';
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-slate-50 rounded-2xl p-4 sm:p-6 w-full max-w-xl lg:max-w-3xl border border-slate-200 max-h-[95vh] flex flex-col">
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-slate-800 flex items-center">
-                <Settings size={20} className="mr-2 text-sky-600"/> Manage Routines
-            </h3>
-            <button onClick={handleCloseModal} className="text-slate-500 hover:text-slate-600">
-                <XCircle size={24} />
-            </button>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleCloseModal}
+      title={
+        <span className="flex items-center gap-2">
+          <Settings size={20} className="text-sky-600" />
+          Manage Routines
+        </span>
+      }
+      size="xl"
+    >
+      {!showRoutineForm ? (
+        <div className="flex h-full flex-col gap-4">
+          <Button onClick={handleOpenAddNewRoutine} fullWidth>
+            <span className="flex items-center justify-center gap-2">
+              <PlusCircle size={18} />
+              Add New Routine
+            </span>
+          </Button>
 
-        {!showRoutineForm ? (
-          <>
-            <button
-              onClick={handleOpenAddNewRoutine}
-              className="mb-4 w-full bg-teal-500 text-white py-2 sm:py-3 px-4 rounded-lg hover:bg-teal-600 transition-colors font-medium text-sm sm:text-base flex items-center justify-center gap-2"
-            >
-              <PlusCircle size={18} /> Add New Routine
-            </button>
-            <div className="flex-1 overflow-y-auto pr-1 space-y-3">
-              {routines.length === 0 ? (
-                <p className="text-slate-500 text-center py-4">No routines defined yet. Click "Add New Routine" to start.</p>
-              ) : (
-                routines.map(routine => (
-                  <div key={routine.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium text-slate-600">{routine.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {routine.completionPoints} pts • 
-                          Assigned to: {routine.appliesToMemberIds.map(id => getMemberNameById(id)).join(', ') || 'None'} • 
-                          {routine.steps.length} steps
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleEditRoutine(routine)} className="p-2 text-slate-600 hover:text-teal-600"><Edit3 size={18}/></button>
-                        <button onClick={() => handleDeleteFullRoutine(routine.id)} className="p-2 text-slate-600 hover:text-red-600"><Trash2 size={18}/></button>
-                      </div>
+          <div className="space-y-3 overflow-y-auto pr-1">
+            {routines.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 py-6 text-center text-sm text-slate-500">
+                No routines defined yet. Click "Add New Routine" to start.
+              </p>
+            ) : (
+              routines.map(routine => (
+                <div key={routine.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-700">{routine.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {routine.completionPoints} pts • Assigned to: {routine.appliesToMemberIds.map(id => getMemberNameById(id)).join(', ') || 'None'} • {routine.steps.length} steps
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" onClick={() => handleEditRoutine(routine)}>
+                        <Edit3 size={16} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleDeleteFullRoutine(routine.id)}
+                        className="text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 size={16} />
+                      </Button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </>
-        ) : editingRoutine && ( // Routine form view
-          <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Routine Name</label>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="border-t border-slate-200 pt-4">
+            <Button variant="ghost" onClick={handleCloseModal} fullWidth>
+              Close
+            </Button>
+          </div>
+        </div>
+      ) : (
+        editingRoutine && (
+          <div className="space-y-5 overflow-y-auto pr-1">
+            <FormField label="Routine Name" htmlFor="routineName" required>
               <input
+                id="routineName"
                 type="text"
                 value={editingRoutine.name}
                 onChange={(e) => handleRoutineChange('name', e.target.value)}
                 placeholder="e.g., Morning Checklist"
-                className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg bg-slate-100/50 text-slate-600 focus:outline-none focus:border-teal-400"
+                className="w-full rounded-lg border border-slate-200 bg-slate-100/50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
               />
-            </div>
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Completion Points</label>
+            </FormField>
+
+            <FormField label="Completion Points" htmlFor="routinePoints" required>
               <input
+                id="routinePoints"
                 type="number"
+                min={0}
                 value={editingRoutine.completionPoints}
                 onChange={(e) => handleRoutineChange('completionPoints', parseInt(e.target.value, 10) || 0)}
-                min="0"
-                className="w-full p-2 sm:p-3 border border-slate-200 rounded-lg bg-slate-100/50 text-slate-600 focus:outline-none focus:border-teal-400"
+                className="w-full rounded-lg border border-slate-200 bg-slate-100/50 p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
                 style={{ colorScheme: 'light' }}
               />
-            </div>
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-600 mb-1">Applies To Members</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border border-slate-200 rounded-lg bg-slate-100/50 max-h-48 overflow-y-auto">
+            </FormField>
+
+            <FormField label="Applies To Members" htmlFor="routineMembers">
+              <div
+                id="routineMembers"
+                className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-100/50 p-2 sm:grid-cols-3"
+              >
                 {familyMembers.map(member => {
                   const isSelected = editingRoutine.appliesToMemberIds.includes(member.id);
                   return (
@@ -208,103 +229,123 @@ const ManageRoutinesModal: React.FC<ManageRoutinesModalProps> = ({
                       key={member.id}
                       onClick={() => handleMemberToggle(member.id)}
                       aria-pressed={isSelected}
-                      className={`
-                        flex items-center p-2 rounded-lg transition-all w-full text-left border
-                        ${isSelected
-                          ? 'bg-teal-50 border-teal-500 shadow-sm'
-                          : 'bg-white border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                        }
-                      `}
+                      className={`flex items-center rounded-lg border p-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
                     >
-                      <div className={`w-5 h-5 rounded-full ${member.color} flex items-center justify-center mr-2 text-[10px] text-white font-semibold`}>
+                      <div className={`${member.color} mr-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold text-white`}>
                         {member.initial}
                       </div>
-                      <span className={`text-xs ${isSelected ? 'text-teal-700 font-medium' : 'text-slate-600'}`}>
-                        {member.name}
-                      </span>
+                      <span className="text-xs font-medium">{member.name}</span>
                     </button>
                   );
                 })}
               </div>
-            </div>
+            </FormField>
 
-            {/* Steps Management */}
-            <div className="p-3 border border-slate-200 rounded-xl bg-white">
-              <h4 className="text-sm font-medium text-slate-600 mb-2">Routine Steps</h4>
-              {/* Add/Edit Step Form */}
-              <div className="space-y-2 mb-3 p-2 border border-dashed border-slate-300 rounded-lg">
-                <input
-                  type="text"
-                  value={currentStep.title}
-                  onChange={(e) => handleStepChange('title', e.target.value)}
-                  placeholder="Step title (e.g., Brush Teeth)"
-                  className="w-full p-2 sm:p-3 border border-slate-200 rounded-md bg-slate-100/50 text-sm text-slate-600 focus:outline-none focus:border-teal-400"
-                />
-                <label className="block text-xs font-medium text-slate-600 mt-1">Step Icon</label>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1 bg-slate-100/50 rounded-md border border-slate-200">
-                  {AVAILABLE_ROUTINE_STEP_ICONS.map(icon => (
-                    <button
-                      key={icon}
-                      onClick={() => handleStepChange('icon', icon)}
-                      className={`p-1 rounded text-lg transition-all ${currentStep.icon === icon ? 'bg-teal-500 text-white scale-110' : 'bg-white hover:bg-teal-100 text-slate-600'}`}
-                      aria-label={`Select icon ${icon}`}
-                    >
-                      {icon}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={handleAddOrUpdateStep}
-                  className="w-full mt-1 bg-slate-300 hover:bg-slate-400 text-slate-600 py-2 px-3 rounded-lg transition-colors text-sm flex items-center justify-center gap-1"
-                >
-                  <Plus size={16}/> {editingStepId ? 'Update Step' : 'Add Step'}
-                </button>
-                {editingStepId && <button onClick={() => { setCurrentStep(DEFAULT_NEW_ROUTINE_STEP_STATE); setEditingStepId(null);}} className="w-full mt-1 text-xs text-slate-600 hover:text-slate-600">Cancel Edit</button>}
-              </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <h4 className="mb-3 text-sm font-semibold text-slate-600">Routine Steps</h4>
 
-              {/* List of Steps */}
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {editingRoutine.steps.map((step, index) => (
-                  <div key={step.id} className="flex items-center justify-between p-1.5 bg-slate-100 rounded-md text-sm">
-                    <span className="text-slate-600">{index + 1}. {getIcon(step.icon)} {step.title}</span>
-                    <div className="flex gap-1">
-                      <button onClick={() => handleEditStep(step)} className="p-1 text-slate-600 hover:text-teal-600"><Edit3 size={14}/></button>
-                      <button onClick={() => handleDeleteStep(step.id)} className="p-1 text-slate-600 hover:text-red-600"><Trash2 size={14}/></button>
-                    </div>
+              <div className="space-y-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
+                <FormField label="Step Title" htmlFor="stepTitle" required>
+                  <input
+                    id="stepTitle"
+                    type="text"
+                    value={currentStep.title}
+                    onChange={(e) => handleStepChange('title', e.target.value)}
+                    placeholder="Step title (e.g., Brush Teeth)"
+                    className="w-full rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-700 focus:border-teal-400 focus:outline-none"
+                  />
+                </FormField>
+
+                <FormField label="Step Icon" htmlFor="stepIcon" required>
+                  <div
+                    id="stepIcon"
+                    className="flex max-h-24 flex-wrap gap-1 overflow-y-auto rounded-md border border-slate-200 bg-slate-100/50 p-1"
+                  >
+                    {AVAILABLE_ROUTINE_STEP_ICONS.map(icon => {
+                      const isSelected = currentStep.icon === icon;
+                      return (
+                        <button
+                          key={icon}
+                          type="button"
+                          onClick={() => handleStepChange('icon', icon)}
+                          className={`rounded p-1 text-lg transition-all ${
+                            isSelected ? 'bg-teal-500 text-white ring-1 ring-teal-300' : 'bg-white text-slate-600 hover:bg-teal-100'
+                          }`}
+                          aria-pressed={isSelected}
+                          aria-label={`Select icon ${icon}`}
+                        >
+                          {icon}
+                        </button>
+                      );
+                    })}
                   </div>
-                ))}
-                {editingRoutine.steps.length === 0 && <p className="text-xs text-slate-400 text-center">No steps added yet.</p>}
+                </FormField>
+
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleAddOrUpdateStep} fullWidth>
+                    <span className="flex items-center justify-center gap-2">
+                      <Plus size={16} />
+                      {editingStepId ? 'Update Step' : 'Add Step'}
+                    </span>
+                  </Button>
+                  {editingStepId && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setCurrentStep(DEFAULT_NEW_ROUTINE_STEP_STATE);
+                        setEditingStepId(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1 overflow-y-auto">
+                {editingRoutine.steps.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-slate-400">No steps added yet.</p>
+                ) : (
+                  editingRoutine.steps.map((step, index) => (
+                    <div key={step.id} className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-2 text-sm">
+                      <span className="text-slate-600">{index + 1}. {getIcon(step.icon)} {step.title}</span>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" onClick={() => handleEditStep(step)} className="px-2 py-1">
+                          <Edit3 size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleDeleteStep(step.id)}
+                          className="px-2 py-1 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                <button
-                onClick={handleSaveFullRoutine}
-                className="flex-1 bg-teal-500 text-white py-2 sm:py-3 px-4 rounded-lg hover:bg-teal-600 transition-colors font-medium text-sm flex items-center justify-center gap-2"
-                >
-                <Save size={18}/> Save Routine
-                </button>
-                <button
-                onClick={() => setShowRoutineForm(false)}
-                className="flex-1 bg-slate-300 text-slate-600 py-2 sm:py-3 px-4 rounded-lg hover:bg-slate-400 transition-colors font-medium text-sm"
-                >
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button onClick={handleSaveFullRoutine} fullWidth>
+                <span className="flex items-center justify-center gap-2">
+                  <Save size={18} />
+                  Save Routine
+                </span>
+              </Button>
+              <Button variant="ghost" onClick={() => setShowRoutineForm(false)} fullWidth>
                 Back to List
-                </button>
+              </Button>
             </div>
           </div>
-        )}
-        
-        {!showRoutineForm && (
-            <div className="mt-auto pt-4 border-t border-slate-200">
-             <button
-                onClick={handleCloseModal}
-                className="w-full bg-slate-300 text-slate-600 py-2 sm:py-3 px-4 rounded-xl hover:bg-slate-400 transition-colors font-medium text-sm sm:text-base"
-            >
-                Close
-            </button>
-            </div>
-        )}
-      </div>
-    </div>
+        )
+      )}
+    </Modal>
   );
 };
 

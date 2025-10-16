@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import QrScanner from 'qr-scanner';
 import { X, Camera, Upload, AlertCircle } from 'lucide-react';
 import { supabaseService } from '../supabaseService';
+import { uiLogger } from '../utils/logger';
 
 interface QRScannerModalProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
       await qrScannerRef.current.start();
     } catch (error) {
-      console.error('Error starting QR scanner:', error);
+      uiLogger.error('Error starting QR scanner', error as Error);
       setError('Failed to access camera. Please check permissions or use manual entry.');
       setIsScanning(false);
     }
@@ -77,7 +78,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const handleScanResult = async (data: string) => {
     try {
       setError(null);
-      console.log('QR Code scanned:', data);
+      uiLogger.debug('QR Code scanned', { dataLength: data.length });
 
       // Try to parse as JSON first (our QR codes)
       let familyData: ScannedFamilyData;
@@ -102,7 +103,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
       await joinFamilyWithCode(familyData);
     } catch (error) {
-      console.error('Error processing QR result:', error);
+      uiLogger.error('Error processing QR result', error as Error);
       setError('Failed to process QR code. Please try again.');
     }
   };
@@ -129,7 +130,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     setError(null);
 
     try {
-      console.log('Attempting to join family with data:', familyData);
+      uiLogger.info('Attempting to join family', { inviteCode: familyData.inviteCode });
 
       // Use the Supabase service to join the family
       const joinResult = await supabaseService.joinFamilyByInvite(familyData.inviteCode, 'child');
@@ -138,7 +139,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         throw new Error(joinResult.error || 'Failed to join family');
       }
 
-      console.log('✅ Successfully joined family:', joinResult.family);
+      uiLogger.info('Successfully joined family', { familyId: joinResult.family?.id, familyName: joinResult.family?.name });
 
       // Enhance the family data with the actual result from Supabase
       const enhancedFamilyData = {
@@ -152,7 +153,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       onClose();
 
     } catch (error: any) {
-      console.error('Error joining family:', error);
+      uiLogger.error('Error joining family', error as Error);
       setError(error.message || 'Failed to join family. Please check the invite code and try again.');
     } finally {
       setIsJoining(false);

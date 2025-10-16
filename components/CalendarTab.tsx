@@ -6,6 +6,7 @@ import { useRealtimeEvents } from '../hooks/useRealtimeData';
 import EventModal from './EventModal';
 import { dataService } from '../dataService';
 
+import { uiLogger } from '../utils/logger';
 interface EventWithPosition extends EventItem {
   position: {
     top: string;
@@ -194,7 +195,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
 
   // Real-time events monitoring
   const { isConnected: isRealtimeConnected, lastUpdate } = useRealtimeEvents((eventType, record) => {
-    console.log(`📅 [CalendarTab] Real-time event update: ${eventType}`, record);
+    uiLogger.debug('Real-time event update', { eventType, recordId: record?.id });
     // The parent component will handle the actual data refresh via the RealtimeProvider
   });
 
@@ -277,7 +278,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
           }
         })
         .catch(error => {
-          console.error("Weather fetch error:", error);
+          uiLogger.error('Weather fetch error', error as Error);
           // Only show the first part of the error message to avoid showing the full URL
           const errorMessage = error.message.split('\n')[0];
           setWeatherError(errorMessage);
@@ -435,7 +436,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
                     const extraCount = attendeeMembers.length > maxAvatars ? attendeeMembers.length - maxAvatars : 0;
                     // Debug log
                     if (attendeeMembers.length > 0) {
-                      console.log(`[CalendarTab] Event '${event.title}' attendees:`, attendeeMembers);
+                      uiLogger.debug('Event attendees', { eventTitle: event.title, attendeeCount: attendeeMembers.length });
                     }
                     return (
                       <div
@@ -534,7 +535,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ events, familyMembers, onAddE
               }
               setEditingEvent(null);
             } catch (error) {
-              console.error('Error updating event:', error);
+              uiLogger.error('Error updating event', error as Error);
               alert('Failed to update event. Please try again.');
             }
           }}

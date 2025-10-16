@@ -8,6 +8,7 @@ import {
   SetStateAction,
   FC
 } from 'react';
+import { uiLogger } from '../utils/logger';
 import { FamilyMember, Chore, TabId } from '../types';
 import { dataService } from '../dataService';
 
