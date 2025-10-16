@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { dataService } from './dataService';
 import SetupWizard from './components/SetupWizard';
 import { RealtimeProvider } from './components/RealtimeProvider';
 import { PerformanceMonitor } from './components/PerformanceMonitor';
 import SplashScreen from './components/SplashScreen';
 import { useAuth } from './hooks/useAuth';
-import { useFamilyData } from './hooks/useFamilyData';
+import { FamilyDataProvider, useFamilyData } from './hooks/useFamilyData';
+import { ModalStateProvider, useModalState } from './hooks/useModalState';
+import { useSupabaseSync } from './hooks/useSupabaseSync';
 import {
   FamilyMember,
   NewFamilyMember,
@@ -47,7 +49,7 @@ const NAVIGATION_ITEMS = [
   { id: 'routines' as TabId, label: 'Routines', icon: 'repeat' }
 ];
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const currentDate = new Date().toISOString().split('T')[0];
 
   // Authentication and setup
@@ -89,41 +91,15 @@ const App: React.FC = () => {
     handleNewPhotoSelected,
     saveFamilyDetails
   } = useFamilyData();
-  
-  // Real-time data update handler
-  const handleRealtimeDataUpdate = useCallback(async (table: string, eventType: string, record: any) => {
-    console.log(`🔄 [App] Handling real-time update for ${table}:`, eventType, record);
-    
-    try {
-      // Refresh specific data based on the table that was updated
-      switch (table) {
-        case 'family_members':
-          const updatedMembers = await dataService.getFamilyMembers();
-          setFamilyMembers(updatedMembers);
-          break;
-        case 'chores':
-          const updatedChores = await dataService.getChores();
-          setChores(updatedChores);
-          break;
-        case 'events':
-          const updatedEvents = await dataService.getEvents();
-          setEvents(updatedEvents);
-          break;
-        case 'rewards':
-          const updatedRewards = await dataService.getRewards();
-          setRewards(updatedRewards);
-          break;
-        case 'routines':
-          const updatedRoutines = await dataService.getRoutines();
-          setRoutines(updatedRoutines);
-          break;
-        default:
-          console.log(`ℹ️ [App] No specific handler for table: ${table}`);
-      }
-    } catch (error) {
-      console.error(`❌ [App] Error refreshing data for ${table}:`, error);
-    }
-  }, []);
+
+  // Real-time data synchronization
+  const { handleRealtimeDataUpdate } = useSupabaseSync({
+    setFamilyMembers,
+    setChores,
+    setEvents,
+    setRewards,
+    setRoutines
+  });
 
 
   // Handle setup completion - wrapper around hook version to also load data
@@ -136,21 +112,38 @@ const App: React.FC = () => {
     }
   }, [handleAuthSetupComplete, loadData, currentDate]);
 
-  // UI state
-  const [activeTab, setActiveTab] = useState<TabId>('family');
-  
-  // State for modals and UI
-  const [isEditingFamily, setIsEditingFamily] = useState(false);
-  const [isAddingMember, setIsAddingMember] = useState(false);
-  const [isAddingEvent, setIsAddingEvent] = useState(false);
-  const [isAddingChore, setIsAddingChore] = useState(false);
-  const [isEditingChore, setIsEditingChore] = useState(false);
-  const [isAddingReward, setIsAddingReward] = useState(false);
-  const [isManagingChoreTypes, setIsManagingChoreTypes] = useState(false);
-  const [isManagingRoutines, setIsManagingRoutines] = useState(false);
-  const [isPerformanceMonitorOpen, setIsPerformanceMonitorOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
-  const [editingChore, setEditingChore] = useState<Chore | null>(null);
+  const {
+    activeTab,
+    handleTabChange,
+    isEditingFamily,
+    setIsEditingFamily,
+    isMemberModalOpen,
+    editingMember,
+    openAddMember,
+    openEditMember,
+    closeMemberModal,
+    isEventModalOpen,
+    openEventModal,
+    closeEventModal,
+    isAddChoreModalOpen,
+    isEditChoreModalOpen,
+    editingChore,
+    openAddChoreModal,
+    openEditChoreModal,
+    closeChoreModals,
+    isAddRewardModalOpen,
+    openAddRewardModal,
+    closeAddRewardModal,
+    isManageChoreTypesOpen,
+    openManageChoreTypes,
+    closeManageChoreTypes,
+    isManageRoutinesOpen,
+    openManageRoutines,
+    closeManageRoutines,
+    isPerformanceMonitorOpen,
+    openPerformanceMonitor,
+    closePerformanceMonitor
+  } = useModalState();
 
 
   // Load data when setup is complete AND auth check is done

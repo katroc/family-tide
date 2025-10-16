@@ -1,4 +1,13 @@
-import { useState, useCallback } from 'react';
+import {
+  useState,
+  useCallback,
+  createContext,
+  useContext,
+  ReactNode,
+  Dispatch,
+  SetStateAction,
+  FC
+} from 'react';
 import { dataService } from '../dataService';
 import {
   FamilyMember,
@@ -28,13 +37,14 @@ export interface UseFamilyDataReturn {
   dailyRoutineProgress: DailyRoutineProgress[];
 
   // Setters (for external updates like real-time)
-  setFamilyMembers: React.Dispatch<React.SetStateAction<FamilyMember[]>>;
-  setChores: React.Dispatch<React.SetStateAction<Chore[]>>;
-  setEvents: React.Dispatch<React.SetStateAction<EventItem[]>>;
-  setRewards: React.Dispatch<React.SetStateAction<Reward[]>>;
-  setRoutines: React.Dispatch<React.SetStateAction<Routine[]>>;
-  setFamilyDetails: React.Dispatch<React.SetStateAction<FamilyDetails>>;
-  setDailyRoutineProgress: React.Dispatch<React.SetStateAction<DailyRoutineProgress[]>>;
+  setFamilyMembers: Dispatch<SetStateAction<FamilyMember[]>>;
+  setChores: Dispatch<SetStateAction<Chore[]>>;
+  setEvents: Dispatch<SetStateAction<EventItem[]>>;
+  setRewards: Dispatch<SetStateAction<Reward[]>>;
+  setRoutines: Dispatch<SetStateAction<Routine[]>>;
+  setChoreTypes: Dispatch<SetStateAction<ChoreType[]>>;
+  setFamilyDetails: Dispatch<SetStateAction<FamilyDetails>>;
+  setDailyRoutineProgress: Dispatch<SetStateAction<DailyRoutineProgress[]>>;
 
   // Load data
   loadData: (currentDate: string) => Promise<void>;
@@ -62,7 +72,7 @@ export interface UseFamilyDataReturn {
  * Custom hook to manage all family-related data and operations
  * Consolidates state management for members, chores, events, rewards, routines, etc.
  */
-export function useFamilyData(): UseFamilyDataReturn {
+function useProvideFamilyData(): UseFamilyDataReturn {
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Data states
@@ -341,9 +351,10 @@ export function useFamilyData(): UseFamilyDataReturn {
     // Setters
     setFamilyMembers,
     setChores,
-    setEvents,
+  	setEvents,
     setRewards,
     setRoutines,
+    setChoreTypes,
     setFamilyDetails,
     setDailyRoutineProgress,
 
@@ -360,4 +371,23 @@ export function useFamilyData(): UseFamilyDataReturn {
     handleNewPhotoSelected,
     saveFamilyDetails
   };
+}
+
+const FamilyDataContext = createContext<UseFamilyDataReturn | undefined>(undefined);
+
+export const FamilyDataProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const value = useProvideFamilyData();
+  return (
+    <FamilyDataContext.Provider value={value}>
+      {children}
+    </FamilyDataContext.Provider>
+  );
+};
+
+export function useFamilyData(): UseFamilyDataReturn {
+  const context = useContext(FamilyDataContext);
+  if (!context) {
+    throw new Error('useFamilyData must be used within a FamilyDataProvider');
+  }
+  return context;
 }
